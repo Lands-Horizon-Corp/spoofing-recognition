@@ -1,0 +1,9 @@
+dataset source 
+
+https://github.com/ZhangYuanhan-AI/CelebA-Spoof
+
+
+TODO:
+[] download dataset
+[] create train jupyter notebook
+[] create api endpoints
