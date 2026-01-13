@@ -1,0 +1,45 @@
+[
+    {
+        "label": "Union",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "FastAPI",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "read_root",
+        "kind": 2,
+        "importPath": "api.app.main",
+        "description": "api.app.main",
+        "peekOfCode": "def read_root():\n    return {\"Hello\": \"World\"}\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int, q: Union[str, None] = None):\n    return {\"item_id\": item_id, \"q\": q}",
+        "detail": "api.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "read_item",
+        "kind": 2,
+        "importPath": "api.app.main",
+        "description": "api.app.main",
+        "peekOfCode": "def read_item(item_id: int, q: Union[str, None] = None):\n    return {\"item_id\": item_id, \"q\": q}",
+        "detail": "api.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "kind": 5,
+        "importPath": "api.app.main",
+        "description": "api.app.main",
+        "peekOfCode": "app = FastAPI()\n@app.get(\"/\")\ndef read_root():\n    return {\"Hello\": \"World\"}\n@app.get(\"/items/{item_id}\")\ndef read_item(item_id: int, q: Union[str, None] = None):\n    return {\"item_id\": item_id, \"q\": q}",
+        "detail": "api.app.main",
+        "documentation": {}
+    }
+]
