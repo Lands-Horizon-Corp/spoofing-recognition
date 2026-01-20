@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+
 import torch
 from torchvision import transforms
 import matplotlib.pyplot as plt
@@ -11,13 +12,16 @@ from torchmetrics.classification import (
     F1Score,
     MulticlassConfusionMatrix,
 )
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision import models
 import torch.nn as nn
 from torchvision.transforms import v2
 import copy
 import gc
 import time
+
+
+from spoofdet.config import mean, std
 
 
 def train_model(
@@ -32,7 +36,16 @@ def train_model(
     early_stopping_limit: int = 3,
     train_transforms: v2.Compose | None = None,
     val_transforms: v2.Compose | None = None,
-):
+) -> tuple[torch.nn.Module, dict[str, list]]:
+    """
+    Trains the given model using the provided data loaders, criterion, and optimizer.
+
+    outputs:
+    - model: The trained model with the best validation loss weights.
+    - history: A dictionary containing training and validation loss and metrics history.
+        precision, accuracy, recall, f1 score
+    """
+
     accuracy = Accuracy(task="binary").to(device)
     precision = Precision(task="binary").to(device)
     recall = Recall(task="binary").to(device)
@@ -225,3 +238,132 @@ def evaluate_model(
     print(f"F1 Score:  {f1_val:.4f}")
 
     return fig, acc_val, prec_val, rec_val, f1_val
+
+
+gpu_transforms_train = v2.Compose(
+    [
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=mean, std=std),
+        v2.RandomHorizontalFlip(p=0.5),
+        v2.RandomRotation(degrees=15),
+    ]
+).to(torch.device)
+
+gpu_transforms_val = v2.Compose(
+    [
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=mean, std=std),
+    ]
+).to(torch.device)
+
+
+def checkImage(dataset, idx):
+    sample_img, sample_label = dataset[idx]
+    display_img = sample_img.permute(1, 2, 0).numpy() / 255.0
+    plt.imshow(display_img)
+    plt.title(f"Label: {'Live' if sample_label == 0 else 'Spoof'}")
+    plt.axis("off")
+    plt.show()
+
+
+def checkAugmentedImage(dataset: Dataset, idx, gpu_transforms: v2.Compose):
+    sample_img, sample_label = dataset[idx]
+
+    # Apply GPU transforms (same as training)
+    sample_img = sample_img.unsqueeze(0).to(torch.device)  # Add batch dim
+    augmented = gpu_transforms(sample_img).squeeze(0).cpu()  # Remove batch dim
+
+    # Denormalize from ImageNet stats
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+    display_img = augmented * std + mean
+    display_img = torch.clamp(display_img, 0, 1)
+
+    display_img = display_img.permute(1, 2, 0).numpy()
+
+    plt.imshow(display_img)
+    plt.title(f"Label: {'Live' if sample_label == 0 else 'Spoof'} (Augmented)")
+    plt.axis("off")
+    plt.show()
+
+
+def create_subset(
+    dataset: Dataset, total_size: int = 1000, spoof_percent: float = 0.5
+) -> Subset:
+    """
+    Creates a Subset  by looking at
+    the internal label dictionary instead of loading images.
+    """
+    num_spoof = int(total_size * spoof_percent)
+    num_live = total_size - num_spoof
+    live_indices = []
+    spoof_indices = []
+
+    print(" Scanning internal label dict for class balance...")
+
+    # Fast Loop: Access RAM only, no File I/O
+    for idx, key in enumerate(dataset.image_keys):
+        # Your specific schema: label is at index 43
+        # 0 = Live, 1 = Spoof
+        label = dataset.label_dict[key][43]
+
+        if label == 0:
+            live_indices.append(idx)
+        else:
+            spoof_indices.append(idx)
+
+    print(f" Found: {len(live_indices)} Live | {len(spoof_indices)} Spoof")
+
+    # Check if we have enough data
+    if len(live_indices) < num_live or len(spoof_indices) < num_spoof:
+        raise ValueError(
+            f"Not enough data to create a balanced set of {total_size}. Reduce total_size."
+        )
+
+    # Random Sampling
+    selected_live = np.random.choice(live_indices, num_live, replace=False)
+    selected_spoof = np.random.choice(spoof_indices, num_spoof, replace=False)
+
+    # Combine and Shuffle
+    # We shuffle indices so the DataLoader doesn't get [500 Live] then [500 Spoof]
+    final_indices = np.concatenate([selected_live, selected_spoof])
+    np.random.shuffle(final_indices)
+
+    return Subset(dataset, final_indices)
+
+
+def checkDatasetDistribution(dataset: Subset):
+    loader = DataLoader(dataset, batch_size=256, num_workers=4, shuffle=False)
+    live_count = 0
+    spoof_count = 0
+    for _, labels in loader:
+        live_in_batch = (labels == 0).sum().item()
+        live_count += live_in_batch
+        spoof_count += labels.size(0) - live_in_batch
+    print(f"Live count: {live_count}, Spoof count: {spoof_count}")
+
+
+def display_train_result(history: dict[str, list]) -> tuple[plt.Figure, plt.Figure]:
+    """
+    Displays training and validation loss and metrics history.
+    Outputs two figures: one for loss and one for precision, accuracy, recall, and F1 score.
+    """
+    fig_loss, ax1 = plt.subplots()
+    ax1.plot(history["train_loss"], label="Train Loss")
+    ax1.plot(history["val_loss"], label="Val Loss")
+    ax1.set_xlabel("Epochs")
+    ax1.set_ylabel("Value")
+    ax1.legend()
+    fig_loss.show()
+
+    fig_precision, ax2 = plt.subplots()
+    ax2.plot(history["val_precision"], label="Val Precision")
+    ax2.plot(history["val_accuracy"], label="Val Accuracy")
+    ax2.plot(history["val_recall"], label="Val Recall")
+    ax2.plot(history["val_f1"], label="Val F1")
+    ax2.set_xlabel("Epochs")
+    ax2.set_ylabel("Value")
+    ax2.legend()
+    fig_precision.show()
+
+    return fig_loss, fig_precision
