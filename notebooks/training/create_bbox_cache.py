@@ -5,7 +5,6 @@ from tqdm import tqdm
 import config
 
 # CONFIG
-JSON_LABEL_PATH = "path/to/train_label.json"
 OUTPUT_BBOX_FILE = "bbox_lookup.json"
 
 

@@ -1,0 +1,7 @@
+pyproject.toml
+src/spoofdet/__init__.py
+src/spoofdet/model_utils.py
+src/spoofing_recognition.egg-info/PKG-INFO
+src/spoofing_recognition.egg-info/SOURCES.txt
+src/spoofing_recognition.egg-info/dependency_links.txt
+src/spoofing_recognition.egg-info/top_level.txt
