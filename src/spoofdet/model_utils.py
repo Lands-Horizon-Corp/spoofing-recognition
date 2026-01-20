@@ -19,9 +19,13 @@ from torchvision.transforms import v2
 import copy
 import gc
 import time
+from pathlib import Path
 
 
 from spoofdet.config import mean, std
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def train_model(
@@ -247,14 +251,14 @@ gpu_transforms_train = v2.Compose(
         v2.RandomHorizontalFlip(p=0.5),
         v2.RandomRotation(degrees=15),
     ]
-).to(torch.device)
+).to(device)
 
 gpu_transforms_val = v2.Compose(
     [
         v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(mean=mean, std=std),
     ]
-).to(torch.device)
+).to(device)
 
 
 def checkImage(dataset, idx):
@@ -270,7 +274,7 @@ def checkAugmentedImage(dataset: Dataset, idx, gpu_transforms: v2.Compose):
     sample_img, sample_label = dataset[idx]
 
     # Apply GPU transforms (same as training)
-    sample_img = sample_img.unsqueeze(0).to(torch.device)  # Add batch dim
+    sample_img = sample_img.unsqueeze(0).to(device)  # Add batch dim
     augmented = gpu_transforms(sample_img).squeeze(0).cpu()  # Remove batch dim
 
     # Denormalize from ImageNet stats
@@ -333,13 +337,11 @@ def create_subset(
 
 
 def checkDatasetDistribution(dataset: Subset):
-    loader = DataLoader(dataset, batch_size=256, num_workers=4, shuffle=False)
     live_count = 0
-    spoof_count = 0
-    for _, labels in loader:
-        live_in_batch = (labels == 0).sum().item()
-        live_count += live_in_batch
-        spoof_count += labels.size(0) - live_in_batch
+    for img, label in dataset:
+        if label.item() == 0:
+            live_count += 1
+    spoof_count = len(dataset) - live_count
     print(f"Live count: {live_count}, Spoof count: {spoof_count}")
 
 
@@ -367,3 +369,283 @@ def display_train_result(history: dict[str, list]) -> tuple[plt.Figure, plt.Figu
     fig_precision.show()
 
     return fig_loss, fig_precision
+
+
+def _create_save_new_path(save_path: Path, path_name: str, num: int) -> Path:
+    new_dir = save_path / f"{path_name}_{num}"
+    if new_dir.exists():
+        return _create_save_new_path(save_path, path_name, num + 1)
+    else:
+        new_dir.mkdir(parents=True)
+        return new_dir
+
+
+def save_results(
+    model: torch.nn.Module,
+    confusion_matrix_fig: plt.Figure,
+    train_loss_fig: plt.Figure,
+    precision_fig: plt.Figure,
+):
+
+    save_path = Path("train_results")
+    path_name = "train"
+    num = 0
+
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    # create new dir if already exist
+    new_path = _create_save_new_path(save_path, path_name, num)
+
+    print(f"Saving results to: {new_path}")
+
+    confusion_matrix_fig.savefig(new_path / "confusion_matrix.png", bbox_inches="tight")
+    train_loss_fig.savefig(new_path / "train_loss.png")
+    precision_fig.savefig(new_path / "precision.png")
+
+    torch.save(model.state_dict(), new_path / "model.pt")
+
+
+def analyze_spoof_types(
+    model: torch.nn.Module,
+    dataset: Subset,
+    device: torch.device,
+    val_transforms: v2.Compose,
+):
+    """
+    Analyzes model performance across different spoof types.
+    Spoof type is at index 40 in the label array.
+    """
+    spoof_type_labels = {
+        0: "Live",
+        1: "Photo",
+        2: "Poster",
+        3: "A4",
+        4: "Face Mask",
+        5: "Upper Body Mask",
+        6: "Region Mask",
+        8: "Pad",
+        7: "PC",
+        9: "Phone",
+        10: "3D Mask",
+    }
+
+    model.eval()
+
+    # Dictionary to store results per spoof type
+    spoof_type_results = {}
+
+    with torch.no_grad():
+        for idx in range(len(dataset)):
+            img, label = dataset[idx]
+
+            # Get the original key to access full label info
+            if hasattr(dataset, "dataset"):  # If it's a Subset
+                actual_idx = dataset.indices[idx]
+                image_key = dataset.dataset.image_keys[actual_idx]
+                full_labels = dataset.dataset.label_dict[image_key]
+            else:
+                image_key = dataset.image_keys[idx]
+                full_labels = dataset.label_dict[image_key]
+
+            spoof_type = full_labels[40]  # Spoof type at index 40
+            live_spoof_label = full_labels[43]  # Live/Spoof at index 43
+
+            # Only analyze spoof images (label = 1)
+            if live_spoof_label != 1:
+                continue
+
+            # Prepare image for model
+            img = img.unsqueeze(0).to(device)
+            img = val_transforms(img)
+
+            # Get prediction
+            output = model(img)
+            pred = torch.argmax(output, dim=1).item()
+
+            # Initialize spoof type entry if needed
+            if spoof_type not in spoof_type_results:
+                spoof_type_results[spoof_type] = {
+                    "total": 0,
+                    "correct": 0,
+                    "incorrect": 0,
+                }
+
+            # Update statistics
+            spoof_type_results[spoof_type]["total"] += 1
+            if pred == 1:  # Correctly identified as spoof
+                spoof_type_results[spoof_type]["correct"] += 1
+            else:  # Incorrectly identified as live
+                spoof_type_results[spoof_type]["incorrect"] += 1
+
+    # Calculate accuracy per spoof type
+    results_df = []
+    for spoof_type, stats in sorted(spoof_type_results.items()):
+        accuracy = (
+            (stats["correct"] / stats["total"] * 100) if stats["total"] > 0 else 0
+        )
+        results_df.append(
+            {
+                "Spoof Type": spoof_type_labels.get(spoof_type, "Unknown"),
+                "Type ID": spoof_type,
+                "Total": stats["total"],
+                "Correct": stats["correct"],
+                "Incorrect": stats["incorrect"],
+                "Accuracy (%)": accuracy,
+            }
+        )
+
+    results_df = pd.DataFrame(results_df)
+    results_df = results_df.sort_values("Accuracy (%)")
+
+    # Visualization
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Bar chart of accuracy per spoof type
+    ax1.barh(
+        results_df["Spoof Type"].astype(str),
+        results_df["Accuracy (%)"],
+        color=[
+            "red" if x < 50 else "orange" if x < 80 else "green"
+            for x in results_df["Accuracy (%)"]
+        ],
+    )
+    ax1.set_xlabel("Accuracy (%)")
+    ax1.set_ylabel("Spoof Type")
+    ax1.set_title("Model Accuracy by Spoof Type")
+    ax1.axvline(x=50, color="red", linestyle="--", alpha=0.5, label="50% threshold")
+    ax1.legend()
+    ax1.grid(axis="x", alpha=0.3)
+
+    # Stacked bar chart showing correct vs incorrect
+    ax2.barh(
+        results_df["Spoof Type"].astype(str),
+        results_df["Correct"],
+        label="Correct (Detected as Spoof)",
+        color="green",
+        alpha=0.7,
+    )
+    ax2.barh(
+        results_df["Spoof Type"].astype(str),
+        results_df["Incorrect"],
+        left=results_df["Correct"],
+        label="Incorrect (Detected as Live)",
+        color="red",
+        alpha=0.7,
+    )
+    ax2.set_xlabel("Number of Samples")
+    ax2.set_ylabel("Spoof Type")
+    ax2.set_title("Correct vs Incorrect Predictions by Spoof Type")
+    ax2.legend()
+    ax2.grid(axis="x", alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+    print("\nSpoof Type Analysis Results:")
+    print("=" * 80)
+    print(results_df.to_string(index=False))
+    print("\n" + "=" * 80)
+    print(f"\nWorst Performing Spoof Types (Accuracy < 70%):")
+    worst = results_df[results_df["Accuracy (%)"] < 70]
+    if len(worst) > 0:
+        print(worst.to_string(index=False))
+    else:
+        print("None - All spoof types have >70% accuracy!")
+
+    return results_df, fig
+
+
+def analyze_dataset_spoof_distribution(
+    dataset: Subset,
+) -> tuple[pd.DataFrame, plt.Figure]:
+    """
+    Analyzes the distribution of spoof types in the dataset.
+    """
+    spoof_type_labels = {
+        0: "Live",
+        1: "Photo",
+        2: "Poster",
+        3: "A4",
+        4: "Face Mask",
+        5: "Upper Body Mask",
+        6: "Region Mask",
+        7: "PC",
+        8: "Pad",
+        9: "Phone",
+        10: "3D Mask",
+    }
+
+    spoof_type_counts = {}
+    live_count = 0
+
+    print("Analyzing spoof type distribution...")
+
+    for idx in range(len(dataset)):
+        # Get the original key to access full label info
+        if hasattr(dataset, "dataset"):  # If it's a Subset
+            actual_idx = dataset.indices[idx]
+            image_key = dataset.dataset.image_keys[actual_idx]
+            full_labels = dataset.dataset.label_dict[image_key]
+        else:
+            image_key = dataset.image_keys[idx]
+            full_labels = dataset.label_dict[image_key]
+
+        live_spoof_label = full_labels[43]  # Live/Spoof at index 43
+
+        if live_spoof_label == 0:  # Live
+            live_count += 1
+        else:  # Spoof
+            spoof_type = full_labels[40]  # Spoof type at index 40
+            spoof_type_counts[spoof_type] = spoof_type_counts.get(spoof_type, 0) + 1
+
+    # Create DataFrame
+    results = []
+    for spoof_type, count in sorted(spoof_type_counts.items()):
+        results.append(
+            {
+                "Spoof Type": spoof_type_labels.get(spoof_type, "Unknown"),
+                "Type ID": spoof_type,
+                "Count": count,
+            }
+        )
+
+    results_df = pd.DataFrame(results)
+    results_df["Percentage"] = (results_df["Count"] / len(dataset) * 100).round(2)
+
+    # Visualization
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Bar chart
+    colors = [
+        "green" if row["Spoof Type"] == "Live" else "red"
+        for _, row in results_df.iterrows()
+    ]
+    ax1.barh(results_df["Spoof Type"], results_df["Count"], color=colors, alpha=0.7)
+    ax1.set_xlabel("Count")
+    ax1.set_ylabel("Spoof Type")
+    ax1.set_title("Spoof Type Distribution in Training Dataset")
+    ax1.grid(axis="x", alpha=0.3)
+
+    # Pie chart
+    ax2.pie(
+        results_df["Count"],
+        labels=results_df["Spoof Type"],
+        autopct="%1.1f%%",
+        startangle=90,
+    )
+    ax2.set_title("Spoof Type Distribution (Percentage)")
+
+    plt.tight_layout()
+    plt.show()
+
+    print("\nSpoof Type Distribution:")
+    print("=" * 60)
+    print(results_df.to_string(index=False))
+    print("=" * 60)
+    print(f"\nTotal samples: {len(dataset)}")
+    print(f"Live samples: {live_count} ({live_count/len(dataset)*100:.2f}%)")
+    print(
+        f"Spoof samples: {len(dataset) - live_count} ({(len(dataset) - live_count)/len(dataset)*100:.2f}%)"
+    )
+
+    return results_df, fig
