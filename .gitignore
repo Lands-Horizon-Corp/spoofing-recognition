@@ -5,3 +5,4 @@ __pycache__/
 bbox_lookup.json
 train_results/
 log
+yolov8n-cls.pt

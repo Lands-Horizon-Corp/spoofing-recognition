@@ -20,7 +20,7 @@ import copy
 import gc
 import time
 from pathlib import Path
-
+import torch.nn.functional as F
 
 from spoofdet.config import mean, std
 
@@ -40,6 +40,7 @@ def train_model(
     early_stopping_limit: int = 3,
     train_transforms: v2.Compose | None = None,
     val_transforms: v2.Compose | None = None,
+    scheduler: torch.optim.lr_scheduler._LRScheduler | None = None,
 ) -> tuple[torch.nn.Module, dict[str, list]]:
     """
     Trains the given model using the provided data loaders, criterion, and optimizer.
@@ -82,13 +83,13 @@ def train_model(
             train_loss = 0.0
             time_started = time.time()
 
-            for images, labels in train_loader:
+            for batch_idx, (images, labels) in enumerate(train_loader):
                 with record_function("data_transfer"):
                     images, labels = images.to(device, non_blocking=True), labels.to(
                         device, non_blocking=True
                     )
                 with record_function("gpu_transforms"):
-                    images = train_transforms(images)
+                    images, labels = train_transforms(images, labels)
 
                 optimizer.zero_grad()
                 with record_function("forward_pass"):
@@ -104,19 +105,19 @@ def train_model(
             val_loss = 0.0
 
             with torch.no_grad():
-                for images, labels in val_loader:
+                for batch_idx, (images, labels) in enumerate(val_loader):
                     with record_function("data_transfer_val"):
                         images, labels = images.to(device), labels.to(device)
                     with record_function("gpu_transforms_val"):
-                        images = val_transforms(images)
-
+                        images, labels = val_transforms(images, labels)
                     with record_function("forward_pass_val"):
                         outputs = model(images)
                         loss = criterion(outputs, labels)
 
                     with record_function("loss_accumulation"):
                         val_loss += loss.item() * images.size(0)
-                        _, predicted = torch.max(outputs.data, 1)
+                        predicted = torch.argmax(outputs, dim=1)
+                        # print("Sample Spoof Probabilities:", spoof_probs[:10])
 
                     with record_function("precision_calculation"):
                         precision.update(predicted, labels)
@@ -138,8 +139,12 @@ def train_model(
             secs = int(epoch_duration % 60)
 
             print(
-                f"Epoch [{epoch+1}/{epochs}] | Time: {mins}m {secs}s Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val Precision: {prec_val:.2f}% | Val Accuracy: {acc_val:.2f}% | Val Recall: {rec_val:.2f}% | Val F1: {f1_val:.2f}%"
+                f"Epoch [{epoch+1}/{epochs}] | Time: {mins}m {secs}s Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val Precision: {prec_val * 100:.2f}% | Val Accuracy: {acc_val * 100:.2f}% | Val Recall: {rec_val * 100:.2f}% | Val F1: {f1_val * 100:.2f}%"
             )
+            if scheduler is not None:
+                scheduler.step()
+                current_lr = scheduler.get_last_lr()[0]
+                print(f"Scheduler Step! New LR: {current_lr:.8f}", end="")
 
             history["train_loss"].append(avg_train_loss)
             history["val_loss"].append(avg_val_loss)
@@ -186,9 +191,9 @@ def evaluate_model(
 
     model.eval()
     with torch.no_grad():
-        for images, labels in dataloader:
+        for batch_idx, (images, labels) in enumerate(dataloader):
             images, labels = images.to(device), labels.to(device)
-            images = val_transforms(images)
+            images, labels = val_transforms(images, labels)
             outputs = model(images)
             preds = torch.argmax(outputs, dim=1)
 
@@ -244,21 +249,40 @@ def evaluate_model(
     return fig, acc_val, prec_val, rec_val, f1_val
 
 
-gpu_transforms_train = v2.Compose(
-    [
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=mean, std=std),
-        v2.RandomHorizontalFlip(p=0.5),
-        v2.RandomRotation(degrees=15),
-    ]
-).to(device)
+def get_transform_pipeline(
+    device: torch.device, target_size: int
+) -> tuple[v2.Compose, v2.Compose]:
+    """
+    Returns training and validation transform pipelines moved to the specified device.
+    """
 
-gpu_transforms_val = v2.Compose(
-    [
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=mean, std=std),
-    ]
-).to(device)
+    gpu_transforms_train = v2.Compose(
+        [
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomRotation(degrees=30),
+            v2.RandomPerspective(distortion_scale=0.4, p=0.2),
+            v2.RandomAffine(
+                degrees=0,
+                translate=(0.2, 0.2),  # Shift left/right/up/down
+                scale=(0.8, 1.2),  # Zoom In AND Zoom Out (crucial!)
+            ),
+            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
+            v2.RandomGrayscale(p=0.1),
+            v2.GaussianNoise(sigma=0.03),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=mean, std=std),
+            v2.RandomErasing(p=0.2),
+            v2.MixUp(num_classes=2, alpha=0.2),
+        ]
+    ).to(device)
+
+    gpu_transforms_val = v2.Compose(
+        [
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=mean, std=std),
+        ]
+    ).to(device)
+    return gpu_transforms_train, gpu_transforms_val
 
 
 def checkImage(dataset, idx):
@@ -272,10 +296,17 @@ def checkImage(dataset, idx):
 
 def checkAugmentedImage(dataset: Dataset, idx, gpu_transforms: v2.Compose):
     sample_img, sample_label = dataset[idx]
+    viz_transforms = v2.Compose(
+        [
+            t
+            for t in gpu_transforms.transforms
+            if not isinstance(t, (v2.MixUp, v2.CutMix))
+        ]
+    )
 
     # Apply GPU transforms (same as training)
     sample_img = sample_img.unsqueeze(0).to(device)  # Add batch dim
-    augmented = gpu_transforms(sample_img).squeeze(0).cpu()  # Remove batch dim
+    augmented = viz_transforms(sample_img).squeeze(0).cpu()  # Remove batch dim
 
     # Denormalize from ImageNet stats
     mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
@@ -292,48 +323,65 @@ def checkAugmentedImage(dataset: Dataset, idx, gpu_transforms: v2.Compose):
 
 
 def create_subset(
-    dataset: Dataset, total_size: int = 1000, spoof_percent: float = 0.5
+    dataset_or_subset: Subset | Dataset,
+    total_size: int = 1000,
+    spoof_percent: float = 0.5,
 ) -> Subset:
     """
     Creates a Subset  by looking at
     the internal label dictionary instead of loading images.
     """
+
+    if isinstance(dataset_or_subset, Subset):
+        source_dataset = dataset_or_subset.dataset
+        valid_indices = (
+            dataset_or_subset.indices
+        )  # The specific indices allowed for this split
+    else:
+        source_dataset = dataset_or_subset
+        valid_indices = range(len(dataset_or_subset))
     num_spoof = int(total_size * spoof_percent)
     num_live = total_size - num_spoof
-    live_indices = []
-    spoof_indices = []
+    live_indices_relative = []
+    spoof_indices_relative = []
 
-    print(" Scanning internal label dict for class balance...")
+    print(" Scanning specific indices for class balance...")
 
-    # Fast Loop: Access RAM only, no File I/O
-    for idx, key in enumerate(dataset.image_keys):
-        # Your specific schema: label is at index 43
-        # 0 = Live, 1 = Spoof
-        label = dataset.label_dict[key][43]
+    # Iterate ONLY over the valid indices for this subset
+    # relative_idx: 0, 1, 2... (index in the new subset)
+    # real_idx: 45, 102, 3... (index in the main dataset)
+    for relative_idx, real_idx in enumerate(valid_indices):
+        key = source_dataset.image_keys[real_idx]
+        # 0 = Live, 1 = Spoof (Index 43 in your schema)
+        label = source_dataset.label_dict[key][43]
 
         if label == 0:
-            live_indices.append(idx)
+            live_indices_relative.append(relative_idx)
         else:
-            spoof_indices.append(idx)
+            spoof_indices_relative.append(relative_idx)
 
-    print(f" Found: {len(live_indices)} Live | {len(spoof_indices)} Spoof")
+    print(
+        f" Found in this split: {len(live_indices_relative)} Live | {len(spoof_indices_relative)} Spoof"
+    )
 
     # Check if we have enough data
-    if len(live_indices) < num_live or len(spoof_indices) < num_spoof:
+    if len(live_indices_relative) < num_live or len(spoof_indices_relative) < num_spoof:
         raise ValueError(
-            f"Not enough data to create a balanced set of {total_size}. Reduce total_size."
+            f"Not enough data in this split to create size {total_size}. "
+            f"Available: {len(live_indices_relative)} Live, {len(spoof_indices_relative)} Spoof."
         )
 
-    # Random Sampling
-    selected_live = np.random.choice(live_indices, num_live, replace=False)
-    selected_spoof = np.random.choice(spoof_indices, num_spoof, replace=False)
+    # Random Sampling from relative indices
+    selected_live = np.random.choice(live_indices_relative, num_live, replace=False)
+    selected_spoof = np.random.choice(spoof_indices_relative, num_spoof, replace=False)
 
     # Combine and Shuffle
-    # We shuffle indices so the DataLoader doesn't get [500 Live] then [500 Spoof]
     final_indices = np.concatenate([selected_live, selected_spoof])
     np.random.shuffle(final_indices)
 
-    return Subset(dataset, final_indices)
+    # Return a Subset OF THE SUBSET
+    # This keeps the chain valid (train_ds -> balanced_train_ds)
+    return Subset(dataset_or_subset, final_indices)
 
 
 def checkDatasetDistribution(dataset: Subset):
@@ -649,3 +697,11 @@ def analyze_dataset_spoof_distribution(
     )
 
     return results_df, fig
+
+
+def display_params(lr, weight_decay, batch_size, epochs, classify_head):
+    print("Training Configuration:")
+    print(f" Learning Rate: {lr}")
+    print(f" Weight Decay: {weight_decay}")
+    print(f" Batch Size: {batch_size}")
+    print(f" Epochs: {epochs}")
