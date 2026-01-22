@@ -67,6 +67,7 @@ def train_model(
     best_model_wts = copy.deepcopy(model.state_dict())
     best_val_loss = float("inf")
     early_stopping_counter = 0
+    best_val_f1 = 0.0
 
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
@@ -89,12 +90,13 @@ def train_model(
                         device, non_blocking=True
                     )
                 with record_function("gpu_transforms"):
-                    images, labels = train_transforms(images, labels)
+                    labels_onehot = F.one_hot(labels, num_classes=2).float()
+                    images, labels_onehot = train_transforms(images, labels_onehot)
 
                 optimizer.zero_grad()
                 with record_function("forward_pass"):
                     outputs = model(images)
-                    loss = criterion(outputs, labels)
+                    loss = criterion(outputs, labels_onehot)
                     loss.backward()
                 optimizer.step()
 
@@ -109,10 +111,11 @@ def train_model(
                     with record_function("data_transfer_val"):
                         images, labels = images.to(device), labels.to(device)
                     with record_function("gpu_transforms_val"):
-                        images, labels = val_transforms(images, labels)
+                        images = val_transforms(images)
                     with record_function("forward_pass_val"):
                         outputs = model(images)
-                        loss = criterion(outputs, labels)
+                        labels_one_hot = F.one_hot(labels, num_classes=2).float()
+                        loss = criterion(outputs, labels_one_hot)
 
                     with record_function("loss_accumulation"):
                         val_loss += loss.item() * images.size(0)
@@ -132,6 +135,7 @@ def train_model(
 
             avg_train_loss = train_loss / len(train_loader.dataset)
             avg_val_loss = val_loss / len(val_loader.dataset)
+            avg_val_f1 = max(best_val_f1, f1_val)
 
             time_ended = time.time()
             epoch_duration = time_ended - time_started
@@ -158,8 +162,8 @@ def train_model(
             recall.reset()
             f1.reset()
 
-            if best_val_loss > avg_val_loss:
-                best_val_loss = avg_val_loss
+            if avg_val_f1 > best_val_f1:
+                best_val_f1 = avg_val_f1
                 best_model_wts = copy.deepcopy(model.state_dict())
                 early_stopping_counter = 0
                 print("  -> New best model saved!")
@@ -193,7 +197,7 @@ def evaluate_model(
     with torch.no_grad():
         for batch_idx, (images, labels) in enumerate(dataloader):
             images, labels = images.to(device), labels.to(device)
-            images, labels = val_transforms(images, labels)
+            images = val_transforms(images)
             outputs = model(images)
             preds = torch.argmax(outputs, dim=1)
 
@@ -260,26 +264,24 @@ def get_transform_pipeline(
         [
             v2.RandomHorizontalFlip(p=0.5),
             v2.RandomRotation(degrees=30),
-            v2.RandomPerspective(distortion_scale=0.4, p=0.2),
+            # v2.RandomPerspective(distortion_scale=0.4, p=0.2),
             v2.RandomAffine(
                 degrees=0,
-                translate=(0.2, 0.2),  # Shift left/right/up/down
+                translate=(0.1, 0.1),  # Shift left/right/up/down
                 scale=(0.8, 1.2),  # Zoom In AND Zoom Out (crucial!)
             ),
             v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
             v2.RandomGrayscale(p=0.1),
             v2.GaussianNoise(sigma=0.03),
             v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=mean, std=std),
-            v2.RandomErasing(p=0.2),
             v2.MixUp(num_classes=2, alpha=0.2),
+            # v2.RandomErasing(p=0.2),
         ]
     ).to(device)
 
     gpu_transforms_val = v2.Compose(
         [
             v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=mean, std=std),
         ]
     ).to(device)
     return gpu_transforms_train, gpu_transforms_val
@@ -307,12 +309,7 @@ def checkAugmentedImage(dataset: Dataset, idx, gpu_transforms: v2.Compose):
     # Apply GPU transforms (same as training)
     sample_img = sample_img.unsqueeze(0).to(device)  # Add batch dim
     augmented = viz_transforms(sample_img).squeeze(0).cpu()  # Remove batch dim
-
-    # Denormalize from ImageNet stats
-    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-    display_img = augmented * std + mean
-    display_img = torch.clamp(display_img, 0, 1)
+    display_img = torch.clamp(augmented, 0, 1)
 
     display_img = display_img.permute(1, 2, 0).numpy()
 
@@ -483,10 +480,10 @@ def analyze_spoof_types(
     spoof_type_results = {}
 
     with torch.no_grad():
+
         for idx in range(len(dataset)):
             img, label = dataset[idx]
 
-            # Get the original key to access full label info
             if hasattr(dataset, "dataset"):  # If it's a Subset
                 actual_idx = dataset.indices[idx]
                 image_key = dataset.dataset.image_keys[actual_idx]
@@ -494,6 +491,8 @@ def analyze_spoof_types(
             else:
                 image_key = dataset.image_keys[idx]
                 full_labels = dataset.label_dict[image_key]
+
+            # Get the original key to access full label info
 
             spoof_type = full_labels[40]  # Spoof type at index 40
             live_spoof_label = full_labels[43]  # Live/Spoof at index 43
@@ -604,13 +603,13 @@ def analyze_spoof_types(
 
 
 def analyze_dataset_spoof_distribution(
-    dataset: Subset,
+    dataset: torch.utils.data.Subset,  # Added type hint for clarity
 ) -> tuple[pd.DataFrame, plt.Figure]:
     """
     Analyzes the distribution of spoof types in the dataset.
     """
     spoof_type_labels = {
-        0: "Live",
+        0: "Live",  # This is the key we want to see in the plot
         1: "Photo",
         2: "Poster",
         3: "A4",
@@ -628,26 +627,41 @@ def analyze_dataset_spoof_distribution(
 
     print("Analyzing spoof type distribution...")
 
-    for idx in range(len(dataset)):
-        # Get the original key to access full label info
-        if hasattr(dataset, "dataset"):  # If it's a Subset
-            actual_idx = dataset.indices[idx]
-            image_key = dataset.dataset.image_keys[actual_idx]
-            full_labels = dataset.dataset.label_dict[image_key]
-        else:
-            image_key = dataset.image_keys[idx]
-            full_labels = dataset.label_dict[image_key]
+    if hasattr(dataset, "dataset"):  # It is a Subset
+        parent_dataset = dataset.dataset
+        indices = dataset.indices
+    else:  # It is the original dataset
+        parent_dataset = dataset
+        indices = range(len(dataset))
+    current_dataset = dataset
+    final_indices = list(range(len(dataset)))
+
+    # unwraps subset inside subset inside subset...
+    while isinstance(current_dataset, torch.utils.data.Subset):
+        # Map the current indices to the parent's indices
+        final_indices = [current_dataset.indices[i] for i in final_indices]
+        current_dataset = current_dataset.dataset
+
+    # Now current_dataset is the root (CelebASpoofDataset)
+    parent_dataset = current_dataset
+    for idx in indices:
+
+        image_key = parent_dataset.image_keys[idx]
+        full_labels = parent_dataset.label_dict[image_key]
 
         live_spoof_label = full_labels[43]  # Live/Spoof at index 43
 
         if live_spoof_label == 0:  # Live
             live_count += 1
         else:  # Spoof
-            spoof_type = full_labels[40]  # Spoof type at index 40
+            spoof_type = full_labels[40]
             spoof_type_counts[spoof_type] = spoof_type_counts.get(spoof_type, 0) + 1
 
-    # Create DataFrame
     results = []
+
+    if live_count > 0:
+        results.append({"Spoof Type": "Live", "Type ID": 0, "Count": live_count})
+
     for spoof_type, count in sorted(spoof_type_counts.items()):
         results.append(
             {
@@ -658,50 +672,95 @@ def analyze_dataset_spoof_distribution(
         )
 
     results_df = pd.DataFrame(results)
+
+    if len(results_df) == 0:
+        print("Warning: Dataset is empty.")
+        return results_df, plt.figure()
+
     results_df["Percentage"] = (results_df["Count"] / len(dataset) * 100).round(2)
 
-    # Visualization
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
-    # Bar chart
     colors = [
         "green" if row["Spoof Type"] == "Live" else "red"
         for _, row in results_df.iterrows()
     ]
     ax1.barh(results_df["Spoof Type"], results_df["Count"], color=colors, alpha=0.7)
     ax1.set_xlabel("Count")
-    ax1.set_ylabel("Spoof Type")
-    ax1.set_title("Spoof Type Distribution in Training Dataset")
+    ax1.set_ylabel("Class Type")
+    ax1.set_title("Class Distribution in Dataset")
     ax1.grid(axis="x", alpha=0.3)
 
-    # Pie chart
     ax2.pie(
         results_df["Count"],
         labels=results_df["Spoof Type"],
         autopct="%1.1f%%",
         startangle=90,
+        colors=colors,
     )
-    ax2.set_title("Spoof Type Distribution (Percentage)")
+    ax2.set_title("Distribution (Percentage)")
 
     plt.tight_layout()
     plt.show()
 
-    print("\nSpoof Type Distribution:")
+    print("\nClass Distribution:")
     print("=" * 60)
     print(results_df.to_string(index=False))
     print("=" * 60)
-    print(f"\nTotal samples: {len(dataset)}")
-    print(f"Live samples: {live_count} ({live_count/len(dataset)*100:.2f}%)")
-    print(
-        f"Spoof samples: {len(dataset) - live_count} ({(len(dataset) - live_count)/len(dataset)*100:.2f}%)"
-    )
 
     return results_df, fig
 
 
-def display_params(lr, weight_decay, batch_size, epochs, classify_head):
+def display_params(
+    lr, weight_decay, batch_size, epochs, early_stopping_limit, target_size
+):
     print("Training Configuration:")
+    print(f" Batch Size: {batch_size}")
     print(f" Learning Rate: {lr}")
     print(f" Weight Decay: {weight_decay}")
-    print(f" Batch Size: {batch_size}")
     print(f" Epochs: {epochs}")
+    print(f" Early Stopping Limit: {early_stopping_limit}")
+    print(f" Target Size: {target_size}")
+
+
+import os
+
+
+def check_subject_leakage(root_dir):
+    """
+    Scans root/train and root/test to ensure no Subject IDs overlap.
+    Assumes structure: root / split / subject_id / ...
+    """
+    splits = ["train", "test"]
+    subject_sets = {}
+
+    # 1. Collect Subject IDs for each split
+    for split in splits:
+        split_path = os.path.join(root_dir, split)
+        if not os.path.exists(split_path):
+            print(f"Error: Could not find folder {split_path}")
+            return
+
+        # Get all folder names (subject_ids) in this split
+        subjects = set(os.listdir(split_path))
+        subject_sets[split] = subjects
+        print(f"Found {len(subjects)} subjects in '{split}'")
+
+    # 2. Check for Overlap
+    # intersection() finds items present in BOTH sets
+    overlap = subject_sets["train"].intersection(subject_sets["test"])
+
+    if len(overlap) > 0:
+        print("\n🚨 CRITICAL FAILURE: DATA LEAK DETECTED! 🚨")
+        print(f"Found {len(overlap)} subjects that are in BOTH Train and Test.")
+        print(f"Example Leaked IDs: {list(overlap)[:5]}")
+        print(
+            "ACTION: You must remove these subjects from one of the sets or re-split."
+        )
+    else:
+        print("\n✅ SUCCESS: No subject leakage detected.")
+        print("Train and Test sets are completely independent.")
+
+
+# Usage:
+# check_subject_leakage("path/to/your/dataset_root")
