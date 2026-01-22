@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import numpy as np
 
@@ -430,6 +431,7 @@ def save_results(
     confusion_matrix_fig: plt.Figure,
     train_loss_fig: plt.Figure,
     precision_fig: plt.Figure,
+    params: json,
 ):
 
     save_path = Path("train_results")
@@ -448,6 +450,8 @@ def save_results(
     precision_fig.savefig(new_path / "precision.png")
 
     torch.save(model.state_dict(), new_path / "model.pt")
+    with open(new_path / "params.json", "w", encoding="utf-8") as f:
+        f.write(params)
 
 
 def analyze_spoof_types(
@@ -721,6 +725,18 @@ def display_params(
     print(f" Epochs: {epochs}")
     print(f" Early Stopping Limit: {early_stopping_limit}")
     print(f" Target Size: {target_size}")
+
+    return json.dumps(
+        {
+            "batch_size": batch_size,
+            "learning_rate": lr,
+            "weight_decay": weight_decay,
+            "epochs": epochs,
+            "early_stopping_limit": early_stopping_limit,
+            "target_size": target_size,
+        },
+        indent=4,
+    )
 
 
 import os
