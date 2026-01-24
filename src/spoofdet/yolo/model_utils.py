@@ -136,7 +136,7 @@ def train_model(
 
             avg_train_loss = train_loss / len(train_loader.dataset)
             avg_val_loss = val_loss / len(val_loader.dataset)
-            avg_val_f1 = max(best_val_f1, f1_val)
+            avg_val_f1 = f1_val
 
             time_ended = time.time()
             epoch_duration = time_ended - time_started
@@ -265,7 +265,7 @@ def get_transform_pipeline(
         [
             v2.RandomHorizontalFlip(p=0.5),
             v2.RandomRotation(degrees=30),
-            # v2.RandomPerspective(distortion_scale=0.4, p=0.2),
+            v2.RandomPerspective(distortion_scale=0.4, p=0.2),
             v2.RandomAffine(
                 degrees=0,
                 translate=(0.1, 0.1),  # Shift left/right/up/down
@@ -273,10 +273,16 @@ def get_transform_pipeline(
             ),
             v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
             v2.RandomGrayscale(p=0.1),
+            v2.GaussianBlur(kernel_size=(3, 5), sigma=(0.1, 2.0)),
             v2.GaussianNoise(sigma=0.03),
             v2.ToDtype(torch.float32, scale=True),
-            v2.MixUp(num_classes=2, alpha=0.2),
-            # v2.RandomErasing(p=0.2),
+            v2.RandomChoice(
+                [
+                    v2.MixUp(num_classes=2, alpha=0.2),
+                    v2.CutMix(num_classes=2, alpha=1.0),
+                ]
+            ),
+            v2.RandomErasing(p=0.2),
         ]
     ).to(device)
 
@@ -303,7 +309,7 @@ def checkAugmentedImage(dataset: Dataset, idx, gpu_transforms: v2.Compose):
         [
             t
             for t in gpu_transforms.transforms
-            if not isinstance(t, (v2.MixUp, v2.CutMix))
+            if not isinstance(t, (v2.MixUp, v2.CutMix, v2.RandomChoice, v2.Normalize))
         ]
     )
 
@@ -449,7 +455,7 @@ def save_results(
     train_loss_fig.savefig(new_path / "train_loss.png")
     precision_fig.savefig(new_path / "precision.png")
 
-    torch.save(model.state_dict(), new_path / "model.pt")
+    torch.save(model.model.state_dict(), new_path / "model.pt")
     with open(new_path / "params.json", "w", encoding="utf-8") as f:
         f.write(params)
 
@@ -613,7 +619,6 @@ def analyze_dataset_spoof_distribution(
     Analyzes the distribution of spoof types in the dataset.
     """
     spoof_type_labels = {
-        0: "Live",  # This is the key we want to see in the plot
         1: "Photo",
         2: "Poster",
         3: "A4",
@@ -716,15 +721,26 @@ def analyze_dataset_spoof_distribution(
 
 
 def display_params(
-    lr, weight_decay, batch_size, epochs, early_stopping_limit, target_size
+    model_name,
+    lr,
+    weight_decay,
+    batch_size,
+    epochs,
+    early_stopping_limit,
+    target_size,
+    train_size,
+    val_size,
 ):
     print("Training Configuration:")
+    print(f"model name: {model_name}")
     print(f" Batch Size: {batch_size}")
     print(f" Learning Rate: {lr}")
     print(f" Weight Decay: {weight_decay}")
     print(f" Epochs: {epochs}")
     print(f" Early Stopping Limit: {early_stopping_limit}")
     print(f" Target Size: {target_size}")
+    print(f" Train Size: {train_size}")
+    print(f" Validation Size: {val_size}")
 
     return json.dumps(
         {
