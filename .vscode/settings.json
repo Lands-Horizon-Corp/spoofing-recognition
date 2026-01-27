@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./src",
+        "./spoofing_detection_api"
+    ]
+}

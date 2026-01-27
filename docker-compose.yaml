@@ -1,0 +1,13 @@
+services:
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:80"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/code/src:/code/spoofing_detection_api
+    volumes:
+      - ./spoofing_detection_api/:/code/spoofing_detection_api
+      - ./src:/code/src

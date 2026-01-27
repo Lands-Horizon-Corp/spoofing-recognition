@@ -2,7 +2,6 @@ import os
 import json
 import torch
 from torch.utils.data import Dataset
-import kornia.augmentation as K
 from torchvision.transforms import v2
 from torchvision.io import read_image
 from torchvision.transforms import functional as F

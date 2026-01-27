@@ -29,6 +29,7 @@ from typing import Literal
 
 
 from spoofdet.config import mean, std
+from spoofdet.data_processing import get_data_for_training
 from spoofdet.spoofing_metric import SpoofingMetric
 from spoofdet.dataset import CelebASpoofDataset
 
