@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 import numpy as np
-
+from matplotlib import pyplot as plt
 import torch
 from torchvision import transforms
 import matplotlib.pyplot as plt
@@ -25,393 +25,15 @@ from pathlib import Path
 import torch.nn.functional as F
 
 import os
+from typing import Literal
 
 
 from spoofdet.config import mean, std
 from spoofdet.spoofing_metric import SpoofingMetric
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def train_model(
-    model,
-    device: torch.device,
-    train_loader: DataLoader,
-    val_loader: DataLoader,
-    criterion: torch.nn.Module,
-    optimizer: torch.optim.Optimizer,
-    epochs: int,
-    profiler_log_name: str,
-    early_stopping_limit: int = 3,
-    train_transforms: v2.Compose | None = None,
-    val_transforms: v2.Compose | None = None,
-    scheduler: torch.optim.lr_scheduler._LRScheduler | None = None,
-) -> tuple[torch.nn.Module, dict[str, list]]:
-    """
-    Trains the given model using the provided data loaders, criterion, and optimizer.
-
-    outputs:
-    - model: The trained model with the best validation loss weights.
-    - history: A dictionary containing training and validation loss and metrics history.
-        precision, accuracy, recall, f1 score
-    """
-
-    accuracy = Accuracy(task="binary").to(device)
-    precision = Precision(task="binary").to(device)
-    recall = Recall(task="binary").to(device)
-    f1 = F1Score(task="binary").to(device)
-    history = {
-        "train_loss": [],
-        "val_loss": [],
-        "val_precision": [],
-        "val_accuracy": [],
-        "val_recall": [],
-        "val_f1": [],
-    }
-
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_val_loss = float("inf")
-    early_stopping_counter = 0
-    best_val_f1 = 0.0
-
-    with profile(
-        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-        record_shapes=True,
-        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler(
-            f"./log/{profiler_log_name}"
-        ),
-        with_stack=True,
-    ) as prof:
-        for epoch in range(epochs):
-
-            model.train()
-            for module in model.modules():
-                if isinstance(module, torch.nn.BatchNorm2d):
-                    module.eval()
-            train_loss = 0.0
-            time_started = time.time()
-
-            for batch_idx, (images, labels) in enumerate(train_loader):
-                with record_function("data_transfer"):
-                    images, labels = images.to(device, non_blocking=True), labels.to(
-                        device, non_blocking=True
-                    )
-                with record_function("gpu_transforms"):
-
-                    images, labels = train_transforms(images, labels)
-
-                optimizer.zero_grad()
-                with record_function("forward_pass"):
-                    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                        outputs = model(images)
-                        loss = criterion(outputs, labels)
-
-                loss.backward()
-                optimizer.step()
-
-                train_loss += loss.item() * images.size(0)
-                prof.step()
-
-            model.eval()
-            val_loss = 0.0
-
-            with torch.no_grad():
-                for batch_idx, (images, labels) in enumerate(val_loader):
-                    with record_function("data_transfer_val"):
-                        images, labels = images.to(device), labels.to(device)
-                    with record_function("gpu_transforms_val"):
-                        images = val_transforms(images)
-                    with record_function("forward_pass_val"):
-
-                        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                            outputs = model(images)
-                            loss = criterion(outputs, labels)
-
-                    with record_function("loss_accumulation"):
-                        val_loss += loss.item() * images.size(0)
-                        predicted = torch.argmax(outputs, dim=1)
-                        # print("Sample Spoof Probabilities:", spoof_probs[:10])
-
-                    with record_function("precision_calculation"):
-                        precision.update(predicted, labels)
-                        accuracy.update(predicted, labels)
-                        recall.update(predicted, labels)
-                        f1.update(predicted, labels)
-
-            acc_val = accuracy.compute().item()
-            prec_val = precision.compute().item()
-            rec_val = recall.compute().item()
-            f1_val = f1.compute().item()
-
-            avg_train_loss = train_loss / len(train_loader.dataset)
-            avg_val_loss = val_loss / len(val_loader.dataset)
-            avg_val_f1 = f1_val
-
-            time_ended = time.time()
-            epoch_duration = time_ended - time_started
-            mins = int(epoch_duration // 60)
-            secs = int(epoch_duration % 60)
-
-            print(
-                f"Epoch [{epoch+1}/{epochs}] | Time: {mins}m {secs}s Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val Precision: {prec_val * 100:.2f}% | Val Accuracy: {acc_val * 100:.2f}% | Val Recall: {rec_val * 100:.2f}% | Val F1: {f1_val * 100:.2f}%"
-            )
-            if scheduler is not None:
-                scheduler.step()
-                current_lr = scheduler.get_last_lr()[0]
-                print(f"Scheduler Step! New LR: {current_lr:.8f}", end="")
-
-            history["train_loss"].append(avg_train_loss)
-            history["val_loss"].append(avg_val_loss)
-            history["val_precision"].append(prec_val)
-            history["val_accuracy"].append(acc_val)
-            history["val_recall"].append(rec_val)
-            history["val_f1"].append(f1_val)
-
-            accuracy.reset()
-            precision.reset()
-            recall.reset()
-            f1.reset()
-
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
-                early_stopping_counter = 0
-                print("  -> New best model saved!")
-            else:
-                early_stopping_counter += 1
-                print(
-                    f"  -> No improvement. Counter: {early_stopping_counter}/{early_stopping_limit}"
-                )
-
-            if early_stopping_counter >= early_stopping_limit:
-                print("Early stopping triggered.")
-                break
-
-    model.load_state_dict(best_model_wts)
-    return model, history
+from spoofdet.dataset import CelebASpoofDataset
 
 
-def evaluate_model(
-    model,
-    dataloader: DataLoader,
-    device: torch.device,
-    val_transforms: v2.Compose | None = None,
-    threshold: float = 0.5,
-):
-    confmat = MulticlassConfusionMatrix(num_classes=2).to(device)
-    accuracy = Accuracy(task="binary").to(device)
-    precision = Precision(task="binary").to(device)
-    recall = Recall(task="binary").to(device)
-    f1 = F1Score(task="binary").to(device)
-    spoof_metric = SpoofingMetric().to(device)
-
-    model.eval()
-    with torch.no_grad():
-        for batch_idx, (images, labels) in enumerate(dataloader):
-            images, labels = images.to(device), labels.to(device)
-            images = val_transforms(images)
-            outputs = model(images)
-            probs = torch.nn.functional.softmax(outputs, dim=1)
-            preds = (probs[:, 1] > threshold).long()
-
-            # Update the metrics with this batch
-            confmat.update(preds, labels)
-            accuracy.update(preds, labels)
-            precision.update(preds, labels)
-            recall.update(preds, labels)
-            f1.update(preds, labels)
-            spoof_metric.update(preds, labels)
-
-    # Compute the final results
-    final_matrix = confmat.compute()
-    print("\nConfusion Matrix:")
-    print(f"         Predicted Live | Predicted Spoof")
-    print(f"Live        {final_matrix[0,0]:>6}     |     {final_matrix[0,1]:>6}")
-    print(f"Spoof       {final_matrix[1,0]:>6}     |     {final_matrix[1,1]:>6}")
-    acc_val = accuracy.compute()
-    prec_val = precision.compute()
-    rec_val = recall.compute()
-    f1_val = f1.compute()
-    spoof_metric_val = spoof_metric.compute()
-
-    # Plot the matrix
-    fig, ax = confmat.plot(labels=["Live", "Spoof"])
-    ax.set_title("Confusion Matrix: Live vs Spoof")
-
-    # Add metrics as text below the matrix
-    metrics_text = (
-        f"Accuracy: {acc_val:.4f}   "
-        f"Precision: {prec_val:.4f}   "
-        f"Recall: {rec_val:.4f}   "
-        f"F1 Score: {f1_val:.4f}   "
-        f"APCER: {spoof_metric_val['APCER']:.4f}   "
-        f"BPCER: {spoof_metric_val['BPCER']:.4f}   "
-        f"ACER: {spoof_metric_val['ACER']:.4f}"
-    )
-
-    # Position the text at the bottom center of the figure
-    fig.text(
-        0.5,
-        -0.05,
-        metrics_text,
-        ha="center",
-        fontsize=10,
-        bbox=dict(
-            facecolor="white", alpha=0.8, edgecolor="gray", boxstyle="round,pad=0.5"
-        ),
-    )
-
-    plt.show()
-
-    print(f"Accuracy: {acc_val:.4f}")
-    print(f"Precision: {prec_val:.4f}")
-    print(f"Recall:    {rec_val:.4f}")
-    print(f"F1 Score:  {f1_val:.4f}")
-    print(
-        f"Spoofing Metrics: APCER: {spoof_metric_val['APCER']:.4f}, BPCER: {spoof_metric_val['BPCER']:.4f}, ACER: {spoof_metric_val['ACER']:.4f}"
-    )
-
-    return fig, acc_val, prec_val, rec_val, f1_val, spoof_metric_val
-
-
-def get_transform_pipeline(
-    device: torch.device, target_size: int
-) -> tuple[v2.Compose, v2.Compose]:
-    """
-    Returns training and validation transform pipelines moved to the specified device.
-    """
-
-    gpu_transforms_train = v2.Compose(
-        [
-            v2.RandomHorizontalFlip(p=0.5),
-            # v2.RandomRotation(degrees=30),
-            v2.RandomPerspective(distortion_scale=0.4, p=0.2),
-            v2.RandomAffine(
-                degrees=0,
-                translate=(0.1, 0.1),  # Shift left/right/up/down
-                scale=(0.8, 1.2),  # Zoom In AND Zoom Out (crucial!)
-            ),
-            v2.ToDtype(torch.float32, scale=True),
-            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
-            v2.RandomGrayscale(p=0.1),
-            v2.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
-            v2.GaussianNoise(sigma=0.01),
-            v2.Normalize(mean=mean, std=std),
-            # v2.RandomChoice(
-            #     [
-            #         v2.MixUp(num_classes=2, alpha=0.2),
-            #         v2.CutMix(num_classes=2, alpha=1.0),
-            #     ]
-            # ),
-            # v2.RandomErasing(p=0.2),
-        ]
-    ).to(device)
-
-    gpu_transforms_val = v2.Compose(
-        [
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=mean, std=std),
-        ]
-    ).to(device)
-    return gpu_transforms_train, gpu_transforms_val
-
-
-def checkImage(dataset, idx):
-    sample_img, sample_label = dataset[idx]
-    display_img = sample_img.permute(1, 2, 0).numpy() / 255.0
-    plt.imshow(display_img)
-    plt.title(f"Label: {'Live' if sample_label == 0 else 'Spoof'}")
-    plt.axis("off")
-    plt.show()
-
-
-def checkAugmentedImage(dataset: Dataset, idx, gpu_transforms: v2.Compose):
-    sample_img, sample_label = dataset[idx]
-    viz_transforms = v2.Compose(
-        [
-            t
-            for t in gpu_transforms.transforms
-            if not isinstance(t, (v2.MixUp, v2.CutMix, v2.RandomChoice, v2.Normalize))
-        ]
-    )
-
-    # Apply GPU transforms (same as training)
-    sample_img = sample_img.unsqueeze(0).to(device)  # Add batch dim
-    augmented = viz_transforms(sample_img).squeeze(0).cpu()  # Remove batch dim
-    display_img = torch.clamp(augmented, 0, 1)
-
-    display_img = display_img.permute(1, 2, 0).numpy()
-
-    plt.imshow(display_img)
-    plt.title(f"Label: {'Live' if sample_label == 0 else 'Spoof'} (Augmented)")
-    plt.axis("off")
-    plt.show()
-
-
-def create_subset(
-    dataset_or_subset: Subset | Dataset,
-    total_size: int = 1000,
-    spoof_percent: float = 0.5,
-) -> Subset:
-    """
-    Creates a Subset  by looking at
-    the internal label dictionary instead of loading images.
-    """
-
-    if isinstance(dataset_or_subset, Subset):
-        source_dataset = dataset_or_subset.dataset
-        valid_indices = (
-            dataset_or_subset.indices
-        )  # The specific indices allowed for this split
-    else:
-        source_dataset = dataset_or_subset
-        valid_indices = range(len(dataset_or_subset))
-    num_spoof = int(total_size * spoof_percent)
-    num_live = total_size - num_spoof
-    live_indices_relative = []
-    spoof_indices_relative = []
-
-    print(" Scanning specific indices for class balance...")
-
-    # Iterate ONLY over the valid indices for this subset
-    # relative_idx: 0, 1, 2... (index in the new subset)
-    # real_idx: 45, 102, 3... (index in the main dataset)
-    for relative_idx, real_idx in enumerate(valid_indices):
-        key = source_dataset.image_keys[real_idx]
-        # 0 = Live, 1 = Spoof (Index 43 in your schema)
-        label = source_dataset.label_dict[key][43]
-
-        if label == 0:
-            live_indices_relative.append(relative_idx)
-        else:
-            spoof_indices_relative.append(relative_idx)
-
-    print(
-        f" Found in this split: {len(live_indices_relative)} Live | {len(spoof_indices_relative)} Spoof"
-    )
-
-    # Check if we have enough data
-    if len(live_indices_relative) < num_live or len(spoof_indices_relative) < num_spoof:
-        raise ValueError(
-            f"Not enough data in this split to create size {total_size}. "
-            f"Available: {len(live_indices_relative)} Live, {len(spoof_indices_relative)} Spoof."
-        )
-
-    # Random Sampling from relative indices
-    selected_live = np.random.choice(live_indices_relative, num_live, replace=False)
-    selected_spoof = np.random.choice(spoof_indices_relative, num_spoof, replace=False)
-
-    # Combine and Shuffle
-    final_indices = np.concatenate([selected_live, selected_spoof])
-    np.random.shuffle(final_indices)
-
-    # Return a Subset OF THE SUBSET
-    # This keeps the chain valid (train_ds -> balanced_train_ds)
-    return Subset(dataset_or_subset, final_indices)
-
-
-def checkDatasetDistribution(dataset: Subset):
+def check_dataset_distribution(dataset: Subset):
     live_count = 0
     for img, label in dataset:
         if label.item() == 0:
@@ -444,57 +66,6 @@ def display_train_result(history: dict[str, list]) -> tuple[plt.Figure, plt.Figu
     fig_precision.show()
 
     return fig_loss, fig_precision
-
-
-def _create_save_new_path(save_path: Path, path_name: str, num: int) -> Path:
-    new_dir = save_path / f"{path_name}_{num}"
-    if new_dir.exists():
-        return _create_save_new_path(save_path, path_name, num + 1)
-    else:
-        new_dir.mkdir(parents=True)
-        return new_dir
-
-
-def save_results(
-    model: torch.nn.Module,
-    confusion_matrix_fig: plt.Figure,
-    train_loss_fig: plt.Figure,
-    precision_fig: plt.Figure,
-    params: json,
-    spoof_fig: plt.Figure,
-):
-    """
-    save all training results to a new directory inside train_results/
-    args:
-    - model: trained model
-    - confusion_matrix_fig: confusion matrix figure
-    - train_loss_fig: training loss figure
-    - precision_fig: precision figure
-    - params: training parameters in json format
-    - spoof_fig: spoof type analysis figure
-
-    """
-
-    save_path = Path("train_results")
-    path_name = "train"
-    num = 0
-
-    save_path.mkdir(parents=True, exist_ok=True)
-
-    # create new dir if already exist
-    new_path = _create_save_new_path(save_path, path_name, num)
-
-    print(f"Saving results to: {new_path}")
-
-    confusion_matrix_fig.savefig(new_path / "confusion_matrix.png", bbox_inches="tight")
-    train_loss_fig.savefig(new_path / "train_loss.png")
-    precision_fig.savefig(new_path / "precision.png")
-
-    torch.save(model.state_dict(), new_path / "model.pt")
-    with open(new_path / "params.json", "w", encoding="utf-8") as f:
-        f.write(params)
-
-    spoof_fig.savefig(new_path / "spoof_type_analysis.png", bbox_inches="tight")
 
 
 def analyze_spoof_types(
@@ -554,8 +125,9 @@ def analyze_spoof_types(
 
             # Get prediction
             output = model(img)
-            pred = torch.argmax(output, dim=1).item()
-
+            # pred = torch.argmax(output, dim=1).item()
+            probs = torch.nn.functional.sigmoid(output)
+            pred = (probs[:, 1] > 0.0143).long().item
             # Initialize spoof type entry if needed
             if spoof_type not in spoof_type_results:
                 spoof_type_results[spoof_type] = {
@@ -790,6 +362,11 @@ def display_params(
             "epochs": epochs,
             "early_stopping_limit": early_stopping_limit,
             "target_size": target_size,
+            "train_size": train_size,
+            "validation size": val_size,
+            "unfrozen layers": num_unfrozen_layers,
+            "backbone lr": backbone_lr,
+            "head lr": head_lr,
         },
         indent=4,
     )
@@ -835,57 +412,115 @@ def check_subject_leakage(root_dir):
 # check_subject_leakage("path/to/your/dataset_root")
 
 
-def split_celeba_json_by_subject(json_path, val_split=0.5):
-    """
-    Parses CelebA-Spoof JSON and creates Subject-Disjoint indices.
-    """
-    with open(json_path, "r") as f:
-        data = json.load(f)  # Assuming list of dicts or maps
+# def get_data_for_training(
+#     json_path: str, train_count: int, val_count: int, spoof_percent: float = 0.5
+# ):
+#     """
+#     enclosed the data reading and splitting process
+#     1. read the json data
+#     2. split the data by subject ids
+#     3. split the data by labels
+#     outputs:
+#     - train_dict: training data dictionary {path : label}
+#     - val_dict: validation data dictionary {path : label}
+#     """
+#     celeba_data = read_json_data_path(json_path)
+#     train_img_paths, val_img_paths = split_json_by_subject(celeba_data)
+#     train_data = split_subject_by_labels(
+#         data_count=train_count,
+#         spoof_percent=spoof_percent,
+#         path_list=train_img_paths,
+#     )
+#     val_data = split_subject_by_labels(
+#         data_count=val_count,
+#         spoof_percent=spoof_percent,
+#         path_list=val_img_paths,
+#     )
+#     for path in train_data:
+#         if path not in celeba_data:
+#             print(f"Missing key in train_data: {path}")
 
-    # 1. Group indices by Subject ID
-    # CelebA-Spoof paths usually look like: "Data/train/Subject_ID/..."
-    subject_indices = {}
+#     train_dict = {path: celeba_data[path] for path in train_data}
+#     val_dict = {path: celeba_data[path] for path in val_data}
 
-    # Check your JSON structure. Assuming keys are file paths or it's a list
-    # If it's a dict { "path/to/img": label }:
-    paths = list(data.keys())
-
-    for idx, path in enumerate(paths):
-        # Extract Subject ID (e.g., from "Data/train/12345/live/001.jpg")
-        # Adjust split logic based on your actual path structure
-        parts = path.split("/")
-        if len(parts) > 2:
-            subj_id = parts[-3]  # or parts[2], verify your path structure!
-        else:
-            subj_id = "unknown"
-
-        if subj_id not in subject_indices:
-            subject_indices[subj_id] = []
-        subject_indices[subj_id].append(idx)
-
-    # 2. Split the SUBJECTS
-    all_subjects = list(subject_indices.keys())
-    # Shuffle subjects to ensure random selection
-    np.random.shuffle(all_subjects)
-
-    split_point = int(len(all_subjects) * (1 - val_split))
-    train_subjs = all_subjects[:split_point]
-    val_subjs = all_subjects[split_point:]
-
-    # 3. Collect Indices
-    train_indices = []
-    val_indices = []
-
-    for subj in train_subjs:
-        train_indices.extend(subject_indices[subj])
-
-    for subj in val_subjs:
-        val_indices.extend(subject_indices[subj])
-
-    return train_indices, val_indices
+#     return train_dict, val_dict
 
 
-# ...existing code...
+# def split_subject_by_labels(
+#     data_count: int,
+#     spoof_percent: float,
+#     path_list: list,
+# ):
+#     """
+#     split the data by labels according to the subject ids
+#     args:
+#     - data_count: total number of data to be selected
+#     - spoof_percent: percentage of spoof data
+#     - path_list: list of data paths to select from output of
+#     """
+#     live_count = int(data_count * (1 - spoof_percent))
+#     spoof_count = data_count - live_count
+#     live_indices_relative = []
+#     spoof_indices_relative = []
+#     for path in path_list:
+#         parts = path.split("/")
+#         label = parts[-2]  # live or spoof
+#         if label == "live":
+#             live_indices_relative.append(path)
+#         elif label == "spoof":
+#             spoof_indices_relative.append(path)
+#     if (
+#         len(live_indices_relative) < live_count
+#         or len(spoof_indices_relative) < spoof_count
+#     ):
+#         raise ValueError("Not enough data to split by labels.")
+#     selected_live = np.random.choice(live_indices_relative, live_count, replace=False)
+#     selected_spoof = np.random.choice(
+#         spoof_indices_relative, spoof_count, replace=False
+#     )
+#     final_data = np.concatenate([selected_live, selected_spoof])
+#     return final_data
+
+
+# def split_json_by_subject(celeba_data: dict[str:list], val_split=0.5):
+#     """
+#     Parses CelebA-Spoof JSON and creates Subject-Disjoint indices.
+#     Args:
+#         celeba_data: Dictionary containing CelebA-Spoof data paths and labels.
+#         val_split: Proportion of subjects to allocate to validation set.
+#     Returns:
+#         train: List of training data paths.
+#         val: List of validation data paths.
+#     """
+
+#     # subject ID : [list of paths]
+#     subject_list_dict = {}
+
+#     # { "path/to/img": label }:
+#     paths = list(celeba_data.keys())
+
+#     for idx, path in enumerate(paths):
+#         # example "Data/train/12345/live/001.jpg"
+#         parts = path.split("/")
+#         if len(parts) < 2:
+#             raise ValueError(f"Unexpected path format: {path}")
+
+#         subj_id = parts[-3]
+#         if subj_id not in subject_list_dict:
+#             subject_list_dict[subj_id] = []
+
+#         subject_list_dict[subj_id].append(path)
+
+#     subject_list = list(subject_list_dict.keys())
+#     np.random.shuffle(subject_list)
+
+#     split_point = int(len(subject_list) * (1 - val_split))
+#     train_subjs = subject_list[:split_point]
+#     val_subjs = subject_list[split_point:]
+
+#     train_img_paths = [path for subj in train_subjs for path in subject_list_dict[subj]]
+#     val_img_paths = [path for subj in val_subjs for path in subject_list_dict[subj]]
+#     return train_img_paths, val_img_paths
 
 
 def verify_subject_split(dataset, train_indices, val_indices):
@@ -906,7 +541,7 @@ def verify_subject_split(dataset, train_indices, val_indices):
         path = dataset.image_keys[idx]
         parts = path.split("/")
         if len(parts) > 2:
-            subj_id = parts[-3]  # Adjust based on your path structure
+            subj_id = parts[-3]
         else:
             subj_id = "unknown"
         train_subjects.add(subj_id)
@@ -945,4 +580,147 @@ def verify_subject_split(dataset, train_indices, val_indices):
         return True
 
 
-# ...existing code...
+def get_model(with_weights: bool = False) -> torch.nn.Module:
+    """getting the model for either training or inference"""
+
+    if with_weights:
+        model = models.efficientnet_v2_s(
+            weights=models.EfficientNet_V2_S_Weights.DEFAULT
+        )
+    else:
+        model = models.efficientnet_v2_s(weights=None)
+
+    in_features = model.classifier[1].in_features
+    model.classifier[1] = nn.Linear(in_features, 2)
+
+    return model
+
+
+def diagnose_dataset_issue(json_path, root_dir, bbox_path):
+    """
+    Run comprehensive diagnostics on your data pipeline.
+    """
+    # 1. Load your current data pipeline
+    train_dict, val_dict = get_data_for_training(
+        json_path=json_path, train_count=100, val_count=20, spoof_percent=0.5
+    )
+
+    # 2. Check for label mismatches between folder names and JSON
+    mismatches = 0
+    sample_size = min(200, len(train_dict))
+
+    print("Checking label consistency...")
+    for i, (path, label_data) in enumerate(list(train_dict.items())[:sample_size]):
+        # Get label from JSON
+        if isinstance(label_data, list):
+            json_label = int(label_data[43])
+        else:
+            json_label = int(label_data)
+
+        # Get label from folder name
+        parts = path.split("/")
+        folder_label_str = parts[-2]  # "live" or "spoof"
+        folder_label = 0 if folder_label_str == "live" else 1
+
+        if json_label != folder_label:
+            mismatches += 1
+            if mismatches <= 5:  # Show first 5 mismatches
+                print(f"  MISMATCH: {path}")
+                print(
+                    f"    JSON says: {'Live' if json_label==0 else 'Spoof'} ({json_label})"
+                )
+                print(f"    Folder says: {folder_label_str} ({folder_label})")
+
+    print(
+        f"\nFound {mismatches} mismatches in {sample_size} samples ({mismatches/sample_size*100:.1f}%)"
+    )
+
+    # 3. Check data leakage
+    print("\nChecking data leakage...")
+    train_subjects = set()
+    val_subjects = set()
+
+    for path in train_dict.keys():
+        parts = path.split("/")
+        if len(parts) >= 3:
+            train_subjects.add(parts[2])  # Subject ID
+
+    for path in val_dict.keys():
+        parts = path.split("/")
+        if len(parts) >= 3:
+            val_subjects.add(parts[2])  # Subject ID
+
+    overlap = train_subjects.intersection(val_subjects)
+    print(f"Train subjects: {len(train_subjects)}")
+    print(f"Val subjects: {len(val_subjects)}")
+    print(f"Overlapping subjects: {len(overlap)}")
+
+    # 4. Check class balance
+    print("\nChecking class balance...")
+    for name, data_dict in [("Train", train_dict), ("Val", val_dict)]:
+        live_count = 0
+        for path, label_data in data_dict.items():
+            if isinstance(label_data, list):
+                label = int(label_data[43])
+            else:
+                label = int(label_data)
+            if label == 0:
+                live_count += 1
+
+        total = len(data_dict)
+        print(f"{name}: {total} images")
+        print(f"  Live: {live_count} ({live_count/total*100:.1f}%)")
+        print(f"  Spoof: {total-live_count} ({(total-live_count)/total*100:.1f}%)")
+
+    return mismatches, len(overlap)
+
+
+def check_spoof_type_distribution(data_dict):
+    """Check which spoof types are actually in your set."""
+    spoof_type_counts = {}
+
+    for path, labels in data_dict.items():
+        if isinstance(labels, list) and len(labels) > 40:
+            spoof_type = labels[40]  # Index 40 = spoof type
+            spoof_type_counts[spoof_type] = spoof_type_counts.get(spoof_type, 0) + 1
+
+    spoof_type_names = {
+        1: "Photo",
+        2: "Poster",
+        3: "A4",
+        4: "Face Mask",
+        5: "Upper Body Mask",
+        6: "Region Mask",
+        7: "PC",
+        8: "Pad",
+        9: "Phone",
+        10: "3D Mask",
+    }
+
+    print("\nCurrent Spoof Type Distribution:")
+    print("=" * 50)
+    total = sum(spoof_type_counts.values())
+
+    for spoof_type, count in sorted(spoof_type_counts.items()):
+        name = spoof_type_names.get(spoof_type, f"Unknown({spoof_type})")
+        print(f"{name:20} {count:5} ({count/total*100:5.1f}%)")
+
+    return spoof_type_counts
+
+
+if __name__ == "__main__":
+    import spoofdet.config as config
+
+    train_dict, val_dict = get_data_for_training(
+        json_path=config.TRAIN_JSON,
+        train_count=1000,
+        val_count=200,
+        spoof_percent=0.5,
+    )
+    spoof_counts = check_spoof_type_distribution(val_dict)
+
+    diagnose_dataset_issue(
+        json_path=config.TRAIN_JSON,
+        root_dir=config.ROOT_DIR,
+        bbox_path=config.BBOX_LOOKUP,
+    )

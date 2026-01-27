@@ -6,6 +6,7 @@ ROOT_DIR = BASE_DIR / "dataset/CelebA_Spoof"
 TRAIN_JSON = BASE_DIR / "dataset/CelebA_Spoof/metas/intra_test/train_label.json"
 TEST_JSON = BASE_DIR / "dataset/CelebA_Spoof/metas/intra_test/test_label.json"
 
+BBOX_LOOKUP = BASE_DIR / "bbox_lookup.json"
 
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
