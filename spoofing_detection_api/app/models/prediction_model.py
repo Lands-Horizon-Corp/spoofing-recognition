@@ -30,8 +30,6 @@ class SpoofDetector:
         self._initialized = True
 
     def _load_model(self):
-        # Load your trained model here
-        # Example for PyTorch:
         model = get_model()
         model.to(device=self.device)
         model.load_state_dict(torch.load(settings.MODEL_PATH, map_location=self.device))
@@ -44,8 +42,9 @@ class SpoofDetector:
             outputs = self.model(processed)
             probs = torch.sigmoid(outputs)
             prediction = (probs[:, 1] > settings.MODEL_THRESHOLD).long()
-            confidence = probs[:, 1].item()
-        return prediction, confidence
+            spoof_confidence = probs[:, 1].item()
+            live_confidence = probs[:, 0].item()
+        return prediction, live_confidence, spoof_confidence
 
     def preprocess(self, image: np.ndarray) -> torch.Tensor:
         assert image.dtype == np.uint8, "Image dtype must be uint8"
@@ -59,7 +58,7 @@ class SpoofDetector:
         assert (
             processed_image.ndim == 4
         ), f"Preprocessed image must have 4 dimensions: {processed_image.shape} {processed_image.ndim}"
-
+        print(f"Processed image shape: {processed_image.shape}")
         return processed_image
 
 
