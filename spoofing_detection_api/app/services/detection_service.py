@@ -26,3 +26,27 @@ async def predict_spoof(upload_file: UploadFile) -> dict:
         "confidence": float(confidence),
         "model_version": detector.version,
     }
+
+
+if __name__ == "__main__":
+    import asyncio
+    from pathlib import Path
+
+    BASEDIR = Path(__file__).resolve().parent
+
+    class MockUploadFile:
+        def __init__(self, file_path):
+            self.filename = file_path
+            self.file_path = file_path
+
+        async def read(self):
+            with open(self.file_path, "rb") as f:
+                return f.read()
+
+    TEST_IMG_PATH = BASEDIR / "test_img.png"
+    img = MockUploadFile(TEST_IMG_PATH)
+    try:
+        pred = asyncio.run(predict_spoof(img))
+        print(pred)
+    except Exception as e:
+        print(f"Error during prediction: {e}")

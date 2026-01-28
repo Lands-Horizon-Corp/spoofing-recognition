@@ -17,8 +17,9 @@ class SpoofDetector:
         if cls._instance is None:
             print("Creating the object for the first time...")
             cls._instance = super(SpoofDetector, cls).__new__(cls)
-            # Initialize your heavy setup here (e.g. loading weights)
-            cls._instance._load_model()
+        cls._instance.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         return cls._instance
 
     def __init__(self):
@@ -26,15 +27,14 @@ class SpoofDetector:
             return
         self.model = self._load_model()
         self.version = "1.0"
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
         self._initialized = True
 
     def _load_model(self):
         # Load your trained model here
         # Example for PyTorch:
         model = get_model()
-        model.load_state_dict(torch.load(settings.MODEL_PATH))
+        model.to(device=self.device)
+        model.load_state_dict(torch.load(settings.MODEL_PATH, map_location=self.device))
         model.eval()
         return model
 
@@ -47,8 +47,27 @@ class SpoofDetector:
             confidence = probs[:, 1].item()
         return prediction, confidence
 
-    def preprocess(self, image):
-        _, gpu_transform_val = get_transform_pipeline(device=self.device)
-        image = gpu_transform_val(image)
+    def preprocess(self, image: np.ndarray) -> torch.Tensor:
+        assert image.dtype == np.uint8, "Image dtype must be uint8"
+        _, gpu_transform_val = get_transform_pipeline(
+            device=self.device, target_size=settings.MODEL_TARGET_SIZE
+        )
+        if isinstance(image, np.ndarray):
+            # Convert NumPy (H, W, C) -> Tensor (C, H, W)
+            image = torch.from_numpy(image).permute(2, 0, 1)
+        processed_image = gpu_transform_val(image).unsqueeze(0).to(self.device)
+        assert (
+            processed_image.ndim == 4
+        ), f"Preprocessed image must have 4 dimensions: {processed_image.shape} {processed_image.ndim}"
 
-        return image
+        return processed_image
+
+
+if __name__ == "__main__":
+    detector = SpoofDetector()
+
+    print("Model loaded successfully.")
+    # params needed
+    print(
+        f"threshold: {settings.MODEL_THRESHOLD} target_size: {settings.MODEL_TARGET_SIZE}"
+    )

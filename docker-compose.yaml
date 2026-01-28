@@ -4,10 +4,11 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8001:80"
+      - "8001:8001"
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/code/src:/code/spoofing_detection_api
     volumes:
       - ./spoofing_detection_api/:/code/spoofing_detection_api
       - ./src:/code/src
+    command: uvicorn spoofing_detection_api.app.main:app --host 0.0.0.0 --port 8001 --reload
