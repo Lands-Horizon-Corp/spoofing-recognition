@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -e .
 # 5. Copy the Application Code
 COPY ./spoofing_detection_api /code/spoofing_detection_api
 
-# 6. Set PYTHONPATH (Critical for your structure)
+# 6. Set PYTHONPATH 
 # This tells Python: "Look for imports in 'src' AND 'spoofing_detection_api'"
 # This fixes "ModuleNotFoundError: No module named 'app'"
 ENV PYTHONPATH="${PYTHONPATH}:/code/src:/code/spoofing_detection_api"

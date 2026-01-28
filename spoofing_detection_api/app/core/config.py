@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from pathlib import Path
 from pydantic import model_validator
 import json
-
+from typing import List
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     MODEL_THRESHOLD: float = 0.5
     API_V1_PREFIX: str = "/api/v1"
     MODEL_TARGET_SIZE: int = 320
+    IS_INDEVELOPMENT: bool = False
+    CORS_ALLOW_ORIGINS: str = "*"
+    PORT: int = 8001
+
+    @property
+    def cors_origins(self) -> List[str]:
+        if self.CORS_ALLOW_ORIGINS == "*":
+            return ["*"]
+        return self.CORS_ALLOW_ORIGINS.split(",")
 
     @model_validator(mode="after")
     def load_model_params(self):
@@ -29,7 +38,7 @@ class Settings(BaseSettings):
         return self
 
     class Config:
-        env_file = ".env"
+        env_file = str(BASE_DIR / ".env")
 
 
 settings = Settings()
