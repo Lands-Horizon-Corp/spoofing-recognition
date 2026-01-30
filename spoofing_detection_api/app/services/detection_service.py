@@ -25,7 +25,6 @@ async def predict_spoof(upload_file: UploadFile) -> dict:
         "is_spoof": bool(prediction),
         "live_confidence": float(live_confidence),
         "spoof_confidence": float(spoof_confidence),
-        "model_version": detector.version,
     }
 
 

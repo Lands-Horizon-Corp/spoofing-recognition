@@ -1,6 +1,3 @@
-from spoofdet.efficient_net.model_utils import get_model
-
-
 import torch
 import numpy as np
 from app.core.config import settings
@@ -15,7 +12,6 @@ class SpoofDetector:
 
     def __new__(cls):
         if cls._instance is None:
-            print("Creating the object for the first time...")
             cls._instance = super(SpoofDetector, cls).__new__(cls)
         cls._instance.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
