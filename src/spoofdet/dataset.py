@@ -1,10 +1,13 @@
-import os
+from __future__ import annotations
+
 import json
+import os
+
 import torch
 from torch.utils.data import Dataset
-from torchvision.transforms import v2
 from torchvision.io import read_image
 from torchvision.transforms import functional as F
+from torchvision.transforms import v2
 
 
 class CelebASpoofDataset(Dataset):
@@ -27,11 +30,11 @@ class CelebASpoofDataset(Dataset):
         if isinstance(json_label_path, dict):
             self.label_dict = json_label_path
         else:
-            with open(json_label_path, "r", encoding="utf-8") as f:
+            with open(json_label_path, encoding='utf-8') as f:
                 self.label_dict = json.load(f)
 
-        print("Loading BBox Cache into RAM...")
-        with open(bbox_json_path, "r", encoding="utf-8") as f:
+        print('Loading BBox Cache into RAM...')
+        with open(bbox_json_path, encoding='utf-8') as f:
             self.bbox_dict = json.load(f)
 
         self.image_keys = list(self.label_dict.keys())
@@ -62,18 +65,30 @@ class CelebASpoofDataset(Dataset):
                 img = F.crop(img, top=y, left=x, height=h, width=w)
             else:
                 c_h, c_w = img.shape[-2:]
-                img = F.center_crop(img, output_size=(min(c_h, c_w), min(c_h, c_w)))
+                img = F.center_crop(
+                    img, output_size=(
+                        min(c_h, c_w), min(c_h, c_w),
+                    ),
+                )
 
         img = F.resize(img, size=self.buffer_size, antialias=True)
-        img = F.center_crop(img, output_size=(self.buffer_size, self.buffer_size))
+        img = F.center_crop(
+            img, output_size=(
+                self.buffer_size, self.buffer_size,
+            ),
+        )
 
         img = img.to(torch.uint8)
         label_data = self.label_dict[rel_path]
 
         # Get the raw label (likely Spoof Type: 0=Live, >0=Spoof)
-        raw_label = label_data[43] if isinstance(label_data, list) else label_data
+        raw_label = label_data[43] if isinstance(
+            label_data, list,
+        ) else label_data
 
-        assert isinstance(raw_label, int), f"Label must be int, got {type(raw_label)}"
+        assert isinstance(raw_label, int), f"Label must be int, got {
+            type(raw_label)
+        }"
         assert raw_label >= 0, f"Label must be non-negative, got {raw_label}"
         assert raw_label <= 1, f"Label must be in [0,1], got {raw_label}"
 
@@ -83,7 +98,7 @@ class CelebASpoofDataset(Dataset):
         return img, label
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from spoofdet import config
 
     dataset = CelebASpoofDataset(

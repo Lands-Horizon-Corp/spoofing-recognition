@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class SoftTargetFocalLoss(nn.Module):
-    def __init__(self, alpha=[0.25, 0.75], gamma=2.0, reduction="mean"):
+    def __init__(self, alpha=[0.25, 0.75], gamma=2.0, reduction='mean'):
         """
         alpha: list of weights for each class (e.g., [weight_for_class_0, weight_for_class_1])
         """
-        super(SoftTargetFocalLoss, self).__init__()
+        super().__init__()
         self.alpha = torch.tensor(alpha) if alpha is not None else None
         self.gamma = gamma
         self.reduction = reduction
@@ -39,9 +41,9 @@ class SoftTargetFocalLoss(nn.Module):
         # Summing over dim=1 (classes) captures the mix of both classes
         loss = loss_components.sum(dim=1)
 
-        if self.reduction == "mean":
+        if self.reduction == 'mean':
             return loss.mean()
-        elif self.reduction == "sum":
+        elif self.reduction == 'sum':
             return loss.sum()
         else:
             return loss

@@ -8,7 +8,7 @@ COPY ./requirements.txt /code/requirements.txt
 COPY ./pyproject.toml /code/pyproject.toml
 
 # 3. Install dependencies
-# We also run 'pip install -e .' to respect your pyproject.toml 
+# We also run 'pip install -e .' to respect your pyproject.toml
 # and install 'spoofdet' as a package.
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -e .
 # 5. Copy the Application Code
 COPY ./spoofing_detection_api /code/spoofing_detection_api
 
-# 6. Set PYTHONPATH 
+# 6. Set PYTHONPATH
 # This tells Python: "Look for imports in 'src' AND 'spoofing_detection_api'"
 # This fixes "ModuleNotFoundError: No module named 'app'"
 ENV PYTHONPATH="${PYTHONPATH}:/code/src:/code/spoofing_detection_api"

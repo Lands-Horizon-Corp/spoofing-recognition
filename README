@@ -1,6 +1,6 @@
 # Spoofing Detection API
 
-## Deployment 
+## Deployment
 
 ### Configuration (.env)
 add the env file on spoofing_detection_api folder
@@ -42,7 +42,7 @@ run this so spoofing_detection_api can use the utilities on src
 pip install -e
 ```
 
-### Fast API 
+### Fast API
 run the following
 
 ```cmd
@@ -55,9 +55,9 @@ uvicorn app.main:app --app-dir spoofing_detection_api --host 0.0.0.0 --port 8002
 
 
 
-# Training 
-all of the code use for training is on the notebook directory.  
+# Training
+all of the code use for training is on the notebook directory.
 
-dataset source 
+dataset source
 
 https://github.com/ZhangYuanhan-AI/CelebA-Spoof

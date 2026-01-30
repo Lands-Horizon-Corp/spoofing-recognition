@@ -1,6 +1,21 @@
 {
-    "python.analysis.extraPaths": [
-        "./src",
-        "./spoofing_detection_api"
-    ]
+  "python.languageServer": "Pylance",
+  "python.analysis.extraPaths": [
+    "./src",
+    "./spoofing_detection_api"
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "python.analysis.typeCheckingMode": "basic",
+  "flake8.args": [
+    "--max-line-length=88"
+  ],
+  "autopep8.args": [
+    "--max-line-length=88"
+  ]
 }

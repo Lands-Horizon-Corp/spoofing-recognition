@@ -1,46 +1,29 @@
-import json
+from __future__ import annotations
 
-import pandas as pd
-import numpy as np
-from matplotlib import pyplot as plt
-import torch
-from torchvision import transforms
-import matplotlib.pyplot as plt
-from torch.profiler import profile, record_function, ProfilerActivity
-from torchmetrics.classification import (
-    Accuracy,
-    Precision,
-    Recall,
-    F1Score,
-    MulticlassConfusionMatrix,
-)
-from torch.utils.data import DataLoader, Dataset, Subset
-from torchvision import models
-import torch.nn as nn
-from torchvision.transforms import v2
-import copy
-import gc
-import time
-from pathlib import Path
-import torch.nn.functional as F
-
-import os
+from typing import cast
 from typing import Literal
 
-
-from spoofdet.config import mean, std
+import matplotlib.pyplot as plt
+import torch
+from matplotlib.figure import Figure
 from spoofdet.spoofing_metric import SpoofingMetric
-from spoofdet.dataset import CelebASpoofDataset
+from torch.utils.data import DataLoader
+from torchmetrics.classification import Accuracy
+from torchmetrics.classification import F1Score
+from torchmetrics.classification import MulticlassConfusionMatrix
+from torchmetrics.classification import Precision
+from torchmetrics.classification import Recall
+from torchvision.transforms import v2
 
 
 def evaluate_model(
-    model,
+    model: torch.nn.Module,
     dataloader: DataLoader,
     device: torch.device,
     val_transforms: v2.Compose | None = None,
     threshold: float = 0.5,
-    final_activation: Literal["softmax", "sigmoid", "argmax"] = "argmax",
-) -> tuple[plt.Figure, float, float, float, float, dict]:
+    final_activation: Literal['softmax', 'sigmoid', 'argmax'] = 'argmax',
+) -> tuple[Figure, float, float, float, float, dict]:
     """
     Evaluates the model on the given dataloader and computes various metrics.
     args:
@@ -49,7 +32,8 @@ def evaluate_model(
     - device: The device to run the evaluation on.
     - val_transforms: Transformations to apply to the validation data.
     - threshold: Threshold for classifying spoof probabilities (used for sigmoid/softmax).
-    - final_activation: The final activation function used in the model ("softmax", "sigmoid", "argmax", or None).
+    - final_activation: The final activation function used in the model
+        ("softmax", "sigmoid", "argmax", or None).
     outputs:
     - fig: Confusion matrix figure.
     - acc_val: Accuracy value.
@@ -59,24 +43,24 @@ def evaluate_model(
     - spoof_metric_val: Dictionary containing APCER, BPCER, and ACER values.
     """
     confmat = MulticlassConfusionMatrix(num_classes=2).to(device)
-    accuracy = Accuracy(task="binary").to(device)
-    precision = Precision(task="binary").to(device)
-    recall = Recall(task="binary").to(device)
-    f1 = F1Score(task="binary").to(device)
+    accuracy = Accuracy(task='binary').to(device)
+    precision = Precision(task='binary').to(device)
+    recall = Recall(task='binary').to(device)
+    f1 = F1Score(task='binary').to(device)
     spoof_metric = SpoofingMetric().to(device)
 
     model.eval()
     with torch.no_grad():
         for batch_idx, (images, labels) in enumerate(dataloader):
             images, labels = images.to(device), labels.to(device)
-            images = val_transforms(images)
+            images = cast(v2.Compose, val_transforms)(images)
             outputs = model(images)
-            if final_activation == "argmax":
+            if final_activation == 'argmax':
                 preds = torch.argmax(outputs, dim=1)
-            elif final_activation == "sigmoid":
+            elif final_activation == 'sigmoid':
                 probs = torch.sigmoid(outputs)
                 preds = (probs[:, 1] > threshold).long()
-            elif final_activation == "softmax":
+            elif final_activation == 'softmax':
                 probs = torch.nn.functional.softmax(outputs, dim=1)
                 preds = (probs[:, 1] > threshold).long()
 
@@ -90,10 +74,18 @@ def evaluate_model(
 
     # Compute the final results
     final_matrix = confmat.compute()
-    print("\nConfusion Matrix:")
-    print(f"         Predicted Live | Predicted Spoof")
-    print(f"Live        {final_matrix[0,0]:>6}     |     {final_matrix[0,1]:>6}")
-    print(f"Spoof       {final_matrix[1,0]:>6}     |     {final_matrix[1,1]:>6}")
+    print('\nConfusion Matrix:')
+    print('         Predicted Live | Predicted Spoof')
+    print(
+        f"Live        {final_matrix[0, 0]:>6}     |     {
+            final_matrix[0, 1]:>6
+        }",
+    )
+    print(
+        f"Spoof       {final_matrix[1, 0]:>6}     |     {
+            final_matrix[1, 1]:>6
+        }",
+    )
     acc_val = accuracy.compute()
     prec_val = precision.compute()
     rec_val = recall.compute()
@@ -101,8 +93,8 @@ def evaluate_model(
     spoof_metric_val = spoof_metric.compute()
 
     # Plot the matrix
-    fig, ax = confmat.plot(labels=["Live", "Spoof"])
-    ax.set_title("Confusion Matrix: Live vs Spoof")
+    fig, ax = confmat.plot(labels=['Live', 'Spoof'])
+    ax.set_title('Confusion Matrix: Live vs Spoof')
 
     # Add metrics as text below the matrix
     metrics_text = (
@@ -120,10 +112,10 @@ def evaluate_model(
         0.5,
         -0.05,
         metrics_text,
-        ha="center",
+        ha='center',
         fontsize=10,
         bbox=dict(
-            facecolor="white", alpha=0.8, edgecolor="gray", boxstyle="round,pad=0.5"
+            facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=0.5',
         ),
     )
 
@@ -134,7 +126,9 @@ def evaluate_model(
     print(f"Recall:    {rec_val:.4f}")
     print(f"F1 Score:  {f1_val:.4f}")
     print(
-        f"Spoofing Metrics: APCER: {spoof_metric_val['APCER']:.4f}, BPCER: {spoof_metric_val['BPCER']:.4f}, ACER: {spoof_metric_val['ACER']:.4f}"
+        f"Spoofing Metrics: APCER: {spoof_metric_val['APCER']:.4f}, BPCER: {
+            spoof_metric_val['BPCER']:.4f
+        }, ACER: {spoof_metric_val['ACER']:.4f}",
     )
 
     return fig, acc_val, prec_val, rec_val, f1_val, spoof_metric_val

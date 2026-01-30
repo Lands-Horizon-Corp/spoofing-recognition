@@ -1,8 +1,11 @@
-from PIL import Image
+from __future__ import annotations
+
 import io
-from fastapi import UploadFile
+
 import numpy as np
 from app.models.prediction_model import SpoofDetector
+from fastapi import UploadFile
+from PIL import Image
 
 
 detector = SpoofDetector()
@@ -13,22 +16,24 @@ async def predict_spoof(upload_file: UploadFile) -> dict:
 
     contents = await upload_file.read()
     try:
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
+        image = Image.open(io.BytesIO(contents)).convert('RGB')
         image_np = np.array(image)
     except Exception as e:
         raise ValueError(
-            f"Invalid image file, file type detected: {upload_file.content_type}"
+            f"Invalid image file, file type detected: {
+                upload_file.content_type
+            }",
         ) from e
     prediction, live_confidence, spoof_confidence = detector.predict(image_np)
 
     return {
-        "is_spoof": bool(prediction),
-        "live_confidence": float(live_confidence),
-        "spoof_confidence": float(spoof_confidence),
+        'is_spoof': bool(prediction),
+        'live_confidence': float(live_confidence),
+        'spoof_confidence': float(spoof_confidence),
     }
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import asyncio
     from pathlib import Path
 
@@ -40,10 +45,10 @@ if __name__ == "__main__":
             self.file_path = file_path
 
         async def read(self):
-            with open(self.file_path, "rb") as f:
+            with open(self.file_path, 'rb') as f:
                 return f.read()
 
-    TEST_IMG_PATH = BASEDIR / "test_img.png"
+    TEST_IMG_PATH = BASEDIR / 'test_img.png'
     img = MockUploadFile(TEST_IMG_PATH)
     try:
         pred = asyncio.run(predict_spoof(img))

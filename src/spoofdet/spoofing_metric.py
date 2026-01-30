@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import cast
+
 import torch
 from torchmetrics import Metric
 
@@ -22,8 +26,8 @@ class SpoofingMetric(Metric):
 
         # We register the state to accumulate predictions and targets over batches
         # dist_reduce_fx="cat" ensures data is concatenated correctly in distributed training
-        self.add_state("preds", default=[], dist_reduce_fx="cat")
-        self.add_state("targets", default=[], dist_reduce_fx="cat")
+        self.add_state('preds', default=torch.tensor([]), dist_reduce_fx='cat')
+        self.add_state('targets', default=torch.tensor([]), dist_reduce_fx='cat')
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         """
@@ -33,17 +37,17 @@ class SpoofingMetric(Metric):
         preds = preds.squeeze()
         target = target.squeeze()
 
-        self.preds.append(preds)
-        self.targets.append(target)
+        self.preds = torch.cat([self.preds, preds])
+        self.targets = torch.cat([self.targets, target])
 
     def compute(self):
         """
         Compute the final APCER, BPCER, and ACER based on all accumulated data.
         Returns a dictionary containing the three metrics.
         """
-        # Concatenate the list of tensors into a single tensor
-        preds = torch.cat(self.preds)
-        targets = torch.cat(self.targets)
+        # Use the accumulated tensors directly
+        preds = self.preds
+        targets = self.targets
 
         # 1. Separate Bona Fide (Live) and Attack (Spoof)
         # Target 1 = Live, Target 0 = Spoof
@@ -72,4 +76,4 @@ class SpoofingMetric(Metric):
         # 4. Calculate ACER (Average Classification Error Rate)
         acer = (apcer + bpcer) / 2.0
 
-        return {"APCER": apcer, "BPCER": bpcer, "ACER": acer}
+        return {'APCER': apcer, 'BPCER': bpcer, 'ACER': acer}

@@ -1,7 +1,10 @@
-from torchvision import models
+from __future__ import annotations
+
+from typing import cast
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torchvision import models
 
 
 class InitializeEfficientNetModel:
@@ -9,19 +12,20 @@ class InitializeEfficientNetModel:
 
     def __init__(self, device: torch.device):
         self.device = device
+        self.model_name = 'efficientnet_v2_s'
 
     def get_model(self, with_weights: bool = False) -> torch.nn.Module:
         """getting the model for either training or inference"""
 
-        if self.model_name == "efficientnet_v2_s":
+        if self.model_name == 'efficientnet_v2_s':
             if with_weights:
                 model = models.efficientnet_v2_s(
-                    weights=models.EfficientNet_V2_S_Weights.DEFAULT
+                    weights=models.EfficientNet_V2_S_Weights.DEFAULT,
                 )
             else:
                 model = models.efficientnet_v2_s(weights=None)
 
-            in_features = model.classifier[1].in_features
+            in_features = cast(nn.Linear, model.classifier[1]).in_features
             model.classifier[1] = nn.Linear(in_features, 2)
 
         else:
@@ -39,14 +43,16 @@ class InitializeEfficientNetModel:
         num_layers_to_freeze = total_layers - num_unfrozen_stages
 
         layer_count = 0
-        for name, child in model.features.named_children():
+        for name, child in cast(nn.Module, model.features).named_children():
             if layer_count < num_layers_to_freeze:
                 for param in child.parameters():
                     param.requires_grad = False
             layer_count += 1
 
         print(
-            f"Froze {num_layers_to_freeze} layers. Unfrozen layers: {num_unfrozen_stages}"
+            f"Froze {num_layers_to_freeze} layers. Unfrozen layers: {
+                num_unfrozen_stages
+            }",
         )
 
 
@@ -71,7 +77,8 @@ def adaptive_batch_norm(model, data_loader, device, num_batches=100):
         if isinstance(module, (nn.BatchNorm2d, nn.SyncBatchNorm)):
             module.reset_running_stats()
             # Optional: Reset momentum to use current batch more strongly
-            module.momentum = 0.1  # Default is 0.1. Lower = more weight on new data.
+            # Default is 0.1. Lower = more weight on new data.
+            module.momentum = 0.1
 
     # 3. Forward pass on target data WITHOUT backpropagation
     with torch.no_grad():

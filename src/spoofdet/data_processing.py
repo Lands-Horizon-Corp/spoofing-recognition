@@ -1,42 +1,24 @@
-import random
+from __future__ import annotations
+
 import json
-import os
-import copy
-import gc
-import time
-from pathlib import Path
+import random
+from typing import Any
+from typing import cast
+from typing import Sized
 
-import pandas as pd
 import numpy as np
-from matplotlib import pyplot as plt
 import torch
-from torchvision import transforms
-from torch.profiler import profile, record_function, ProfilerActivity
-from torchmetrics.classification import (
-    Accuracy,
-    Precision,
-    Recall,
-    F1Score,
-    MulticlassConfusionMatrix,
-)
-from torch.utils.data import DataLoader, Dataset, Subset
-from torchvision import models
-import torch.nn as nn
-from torchvision.transforms import v2
-
-import torch.nn.functional as F
-
-
-from typing import Dict, List, Tuple
-
-
-from spoofdet.config import mean, std
-from spoofdet.spoofing_metric import SpoofingMetric
+from spoofdet.config import mean
+from spoofdet.config import std
 from spoofdet.dataset import CelebASpoofDataset
+from torch.utils.data import Dataset
+from torch.utils.data import Subset
+from torchvision.transforms import v2
 
 
 def get_transform_pipeline(
-    device: torch.device, target_size: int
+    device: torch.device,
+    target_size: int,
 ) -> tuple[v2.Compose, v2.Compose]:
     """
     Returns training and validation transform pipelines moved to the specified device.
@@ -60,7 +42,12 @@ def get_transform_pipeline(
             #     scale=(0.8, 1.2),  # Zoom In AND Zoom Out (crucial!)
             # ),
             v2.ToDtype(torch.float32, scale=True),
-            v2.ColorJitter(brightness=0.05, contrast=0.05, saturation=0.02, hue=0),
+            v2.ColorJitter(
+                brightness=0.05,
+                contrast=0.05,
+                saturation=0.02,
+                hue=0,
+            ),
             # v2.Grayscale(num_output_channels=3),
             # v2.RandomGrayscale(p=0.1),
             # v2.GaussianBlur(kernel_size=3, sigma=(0.3, 2.0)),
@@ -73,7 +60,7 @@ def get_transform_pipeline(
             #         v2.CutMix(num_classes=2, alpha=1.0),
             #     ]
             # ),
-        ]
+        ],
     ).to(device)
 
     gpu_transforms_val = v2.Compose(
@@ -81,7 +68,7 @@ def get_transform_pipeline(
             v2.Resize((target_size, target_size), antialias=True),
             v2.ToDtype(torch.float32, scale=True),
             v2.Normalize(mean=mean, std=std),
-        ]
+        ],
     ).to(device)
     return gpu_transforms_train, gpu_transforms_val
 
@@ -103,21 +90,25 @@ def create_subset(
         )  # The specific indices allowed for this split
     else:
         source_dataset = dataset_or_subset
-        valid_indices = range(len(dataset_or_subset))
+        valid_indices = range(len(cast(Sized, dataset_or_subset)))
     num_spoof = int(total_size * spoof_percent)
     num_live = total_size - num_spoof
     live_indices_relative = []
     spoof_indices_relative = []
 
-    print(" Scanning specific indices for class balance...")
+    print(' Scanning specific indices for class balance...')
 
-    # Iterate ONLY over the valid indices for this subset
-    # relative_idx: 0, 1, 2... (index in the new subset)
-    # real_idx: 45, 102, 3... (index in the main dataset)
     for relative_idx, real_idx in enumerate(valid_indices):
-        key = source_dataset.image_keys[real_idx]
+        key = cast(CelebASpoofDataset, source_dataset).image_keys[real_idx]
         # 0 = Live, 1 = Spoof (Index 43 in your schema)
-        label = int(source_dataset.label_dict[key][43])
+        label = int(
+            cast(
+                CelebASpoofDataset,
+                source_dataset,
+            ).label_dict[
+                key
+            ][43],
+        )
 
         if label == 0:
             live_indices_relative.append(relative_idx)
@@ -125,19 +116,31 @@ def create_subset(
             spoof_indices_relative.append(relative_idx)
 
     print(
-        f" Found in this split: {len(live_indices_relative)} Live | {len(spoof_indices_relative)} Spoof"
+        f" Found in this split: {len(live_indices_relative)} Live | {
+            len(spoof_indices_relative)
+        } Spoof",
     )
 
     # Check if we have enough data
     if len(live_indices_relative) < num_live or len(spoof_indices_relative) < num_spoof:
         raise ValueError(
             f"Not enough data in this split to create size {total_size}. "
-            f"Available: {len(live_indices_relative)} Live, {len(spoof_indices_relative)} Spoof."
+            f"Available: {len(live_indices_relative)} Live, {
+                len(spoof_indices_relative)
+            } Spoof.",
         )
 
     # Random Sampling from relative indices
-    selected_live = np.random.choice(live_indices_relative, num_live, replace=False)
-    selected_spoof = np.random.choice(spoof_indices_relative, num_spoof, replace=False)
+    selected_live = np.random.choice(
+        live_indices_relative,
+        num_live,
+        replace=False,
+    )
+    selected_spoof = np.random.choice(
+        spoof_indices_relative,
+        num_spoof,
+        replace=False,
+    )
 
     # Combine and Shuffle
     final_indices = np.concatenate([selected_live, selected_spoof])
@@ -145,17 +148,19 @@ def create_subset(
 
     # Return a Subset OF THE SUBSET
     # This keeps the chain valid (train_ds -> balanced_train_ds)
-    return Subset(dataset_or_subset, final_indices)
+    return Subset(dataset_or_subset, cast(Any, final_indices))
 
 
 def read_json_data_path(json_path: str):
     """
     reading the CelebA-Spoof JSON
     """
-    with open(json_path, "r") as f:
+    with open(json_path) as f:
         celeba_data = json.load(f)
     if not isinstance(celeba_data, dict):
-        raise ValueError("The JSON data is not in the expected dictionary format.")
+        raise ValueError(
+            'The JSON data is not in the expected dictionary format.',
+        )
     return celeba_data
 
 
@@ -165,7 +170,7 @@ def get_data_for_training(
     val_count: int,
     spoof_percent: float = 0.5,
     seed: int = 42,
-) -> Tuple[Dict[str, list], Dict[str, list]]:
+) -> tuple[dict[str, list], dict[str, list]]:
     """
     Complete data processing with subject-disjoint splitting and label balancing.
 
@@ -184,16 +189,20 @@ def get_data_for_training(
     train_paths_only = {
         path: labels
         for path, labels in celeba_data.items()
-        if path.startswith("Data/train/")  # Only training set
+        if path.startswith('Data/train/')  # Only training set
     }
 
     print(f"Total training images: {len(train_paths_only)}")
 
     # 3. Split by subject (subject-disjoint)
-    train_subject_paths, val_subject_paths = split_json_by_subject(train_paths_only)
+    train_subject_paths, val_subject_paths = split_json_by_subject(
+        train_paths_only,
+    )
 
     print(
-        f"Subject-split - Train: {len(train_subject_paths)}, Val: {len(val_subject_paths)}"
+        f"Subject-split - Train: {
+            len(train_subject_paths)
+        }, Val: {len(val_subject_paths)}",
     )
 
     # 4. Balance by labels using JSON labels (not folder names)
@@ -216,15 +225,18 @@ def get_data_for_training(
     val_dict = {path: celeba_data[path] for path in val_balanced_paths}
 
     # 6. Statistics
-    print_stats(train_dict, "Training")
-    print_stats(val_dict, "Validation")
+    print_stats(train_dict, 'Training')
+    print_stats(val_dict, 'Validation')
 
     return train_dict, val_dict
 
 
 def balance_by_labels(
-    path_list: List[str], target_count: int, spoof_percent: float, celeba_data: Dict
-) -> List[str]:
+    path_list: list[str],
+    target_count: int,
+    spoof_percent: float,
+    celeba_data: dict,
+) -> list[str]:
     """
     Balance data by live/spoof labels using JSON labels (not folder names).
     """
@@ -253,10 +265,14 @@ def balance_by_labels(
 
     # Check availability
     if len(live_paths) < live_count:
-        raise ValueError(f"Insufficient live images: {len(live_paths)} < {live_count}")
+        raise ValueError(
+            f"Insufficient live images: {
+                len(live_paths)
+            } < {live_count}",
+        )
     if len(spoof_paths) < spoof_count:
         raise ValueError(
-            f"Insufficient spoof images: {len(spoof_paths)} < {spoof_count}"
+            f"Insufficient spoof images: {len(spoof_paths)} < {spoof_count}",
         )
 
     # Random selection
@@ -271,18 +287,18 @@ def balance_by_labels(
 
 
 def split_json_by_subject(
-    celeba_data: Dict[str, List],
+    celeba_data: dict[str, list],
     val_split: float = 0.2,  # Changed from 0.5 - typical 80/20 split
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     """
     Create subject-disjoint splits for CelebA-Spoof.
     Only processes training data (paths starting with 'Data/train/').
     """
     # Group paths by subject ID
-    subject_to_paths = {}
+    subject_to_paths: dict[str, list[str]] = {}
 
     for path in celeba_data.keys():
-        parts = path.split("/")
+        parts = path.split('/')
         if len(parts) < 4:
             print(f"Warning: Unexpected path format: {path}")
             continue
@@ -314,14 +330,16 @@ def split_json_by_subject(
         val_paths.extend(subject_to_paths[subject])
 
     print(
-        f"Subjects: {len(subjects)} total, {len(train_subjects)} train, {len(val_subjects)} val"
+        f"Subjects: {len(subjects)} total, {len(train_subjects)} train, {
+            len(val_subjects)
+        } val",
     )
     print(f"Images: {len(train_paths)} train, {len(val_paths)} val")
 
     return train_paths, val_paths
 
 
-def print_stats(data_dict: Dict, name: str):
+def print_stats(data_dict: dict, name: str):
     """Print statistics about the dataset."""
     live_count = 0
     spoof_count = 0
@@ -339,14 +357,19 @@ def print_stats(data_dict: Dict, name: str):
     print(f"  Spoof: {spoof_count} ({spoof_count/total*100:.1f}%)")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import spoofdet.config as config
 
     train_dict, val_dict = get_data_for_training(
-        json_path=config.TRAIN_JSON, train_count=1000, val_count=200, spoof_percent=0.5
+        json_path=str(config.TRAIN_JSON),
+        train_count=1000,
+        val_count=200,
+        spoof_percent=0.5,
     )
     train_ds = CelebASpoofDataset(
         root_dir=config.ROOT_DIR,
         json_label_path=train_dict,
         bbox_json_path=config.BBOX_LOOKUP,
+        target_size=320,
+        bbox_original_size=config.BBOX_ORGINAL_SIZE,
     )

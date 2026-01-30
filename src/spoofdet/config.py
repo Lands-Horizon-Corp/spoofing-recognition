@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-ROOT_DIR = BASE_DIR / "dataset/CelebA_Spoof"
-TRAIN_JSON = BASE_DIR / "dataset/CelebA_Spoof/metas/intra_test/train_label.json"
-TEST_JSON = BASE_DIR / "dataset/CelebA_Spoof/metas/intra_test/test_label.json"
+ROOT_DIR = BASE_DIR / 'dataset/CelebA_Spoof'
+TRAIN_JSON = BASE_DIR / 'dataset/CelebA_Spoof/metas/intra_test/train_label.json'
+TEST_JSON = BASE_DIR / 'dataset/CelebA_Spoof/metas/intra_test/test_label.json'
 
-BBOX_LOOKUP = BASE_DIR / "bbox_lookup.json"
+BBOX_LOOKUP = BASE_DIR / 'bbox_lookup.json'
 
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
@@ -26,5 +28,5 @@ WORKERS = 4
 SPOOF_PERCENT = 0.7
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     print(f"Project Root is: {BASE_DIR}")
