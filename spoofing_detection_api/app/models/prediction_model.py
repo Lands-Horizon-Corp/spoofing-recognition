@@ -54,7 +54,6 @@ class SpoofDetector:
         assert (
             processed_image.ndim == 4
         ), f"Preprocessed image must have 4 dimensions: {processed_image.shape} {processed_image.ndim}"
-        print(f"Processed image shape: {processed_image.shape}")
         return processed_image
 
 
