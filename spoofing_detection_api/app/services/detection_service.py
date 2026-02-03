@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import io
+from typing import cast
 
 import numpy as np
 from app.models.prediction_model import SpoofDetector
 from fastapi import UploadFile
 from PIL import Image
-
 
 detector = SpoofDetector()
 
@@ -19,11 +19,7 @@ async def predict_spoof(upload_file: UploadFile) -> dict:
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         image_np = np.array(image)
     except Exception as e:
-        raise ValueError(
-            f"Invalid image file, file type detected: {
-                upload_file.content_type
-            }",
-        ) from e
+        raise ValueError(f"Invalid image file, file type detected: {upload_file.content_type}") from e
     prediction, live_confidence, spoof_confidence = detector.predict(image_np)
 
     return {
@@ -51,7 +47,7 @@ if __name__ == '__main__':
     TEST_IMG_PATH = BASEDIR / 'test_img.png'
     img = MockUploadFile(TEST_IMG_PATH)
     try:
-        pred = asyncio.run(predict_spoof(img))
+        pred = asyncio.run(predict_spoof(cast(UploadFile, img)))
         print(pred)
     except Exception as e:
         print(f"Error during prediction: {e}")

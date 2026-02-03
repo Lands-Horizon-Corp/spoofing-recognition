@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
-from typing import cast
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
-from spoofdet.data_processing import get_data_for_training
-from spoofdet.dataset import CelebASpoofDataset
 from torch.utils.data import Subset
 from torchvision import models
 from torchvision.transforms import v2
+
+from spoofdet.data_processing import get_data_for_training
+from spoofdet.dataset import CelebASpoofDataset
 
 
 def check_dataset_distribution(dataset: Subset):
@@ -532,19 +532,10 @@ def diagnose_dataset_issue(json_path, root_dir, bbox_path):
             mismatches += 1
             if mismatches <= 5:  # Show first 5 mismatches
                 print(f"  MISMATCH: {path}")
-                print(
-                    f"    JSON says: {
-                        'Live' if json_label ==
-                        0 else 'Spoof'
-                    } {json_label}",
-                )
+                print(f"    JSON says: {'Live' if json_label == 0 else 'Spoof'} {json_label}")
                 print(f"    Folder says: {folder_label_str} ({folder_label})")
 
-    print(
-        f"\nFound {mismatches} mismatches in {
-            sample_size
-        } samples ({mismatches/sample_size*100:.1f}%)",
-    )
+    print(f"\nFound {mismatches} mismatches in {sample_size} samples ({mismatches/sample_size*100:.1f}%)")
 
     # 3. Check data leakage
     print('\nChecking data leakage...')
@@ -581,11 +572,7 @@ def diagnose_dataset_issue(json_path, root_dir, bbox_path):
         total = len(data_dict)
         print(f"{name}: {total} images")
         print(f"  Live: {live_count} ({live_count/total*100:.1f}%)")
-        print(
-            f"  Spoof: {
-                total-live_count
-            } ({(total-live_count)/total*100:.1f}%)",
-        )
+        print(f"  Spoof: {total-live_count} ({(total-live_count)/total*100:.1f}%)")
 
     return mismatches, len(overlap)
 

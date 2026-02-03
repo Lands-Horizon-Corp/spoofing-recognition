@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import json
 import random
-from typing import Any
-from typing import cast
-from typing import Sized
+from typing import Any, Sized, cast
 
 import numpy as np
 import torch
-from spoofdet.config import mean
-from spoofdet.config import std
-from spoofdet.dataset import CelebASpoofDataset
-from torch.utils.data import Dataset
-from torch.utils.data import Subset
+from torch.utils.data import Dataset, Subset
 from torchvision.transforms import v2
+
+from spoofdet.config import mean, std
+from spoofdet.dataset import CelebASpoofDataset
 
 
 def get_transform_pipeline(
@@ -115,19 +112,13 @@ def create_subset(
         elif label == 1:
             spoof_indices_relative.append(relative_idx)
 
-    print(
-        f" Found in this split: {len(live_indices_relative)} Live | {
-            len(spoof_indices_relative)
-        } Spoof",
-    )
+    print(f" Found in this split: {len(live_indices_relative)} Live | {len(spoof_indices_relative)} Spoof")
 
     # Check if we have enough data
     if len(live_indices_relative) < num_live or len(spoof_indices_relative) < num_spoof:
         raise ValueError(
             f"Not enough data in this split to create size {total_size}. "
-            f"Available: {len(live_indices_relative)} Live, {
-                len(spoof_indices_relative)
-            } Spoof.",
+            f"Available: {len(live_indices_relative)} Live, {len(spoof_indices_relative)} Spoof.",
         )
 
     # Random Sampling from relative indices
@@ -199,11 +190,7 @@ def get_data_for_training(
         train_paths_only,
     )
 
-    print(
-        f"Subject-split - Train: {
-            len(train_subject_paths)
-        }, Val: {len(val_subject_paths)}",
-    )
+    print(f"Subject-split - Train: {len(train_subject_paths)}, Val: {len(val_subject_paths)}")
 
     # 4. Balance by labels using JSON labels (not folder names)
     train_balanced_paths = balance_by_labels(
@@ -265,16 +252,9 @@ def balance_by_labels(
 
     # Check availability
     if len(live_paths) < live_count:
-        raise ValueError(
-            f"Insufficient live images: {
-                len(live_paths)
-            } < {live_count}",
-        )
+        raise ValueError(f"Insufficient live images: {len(live_paths)} < {live_count}")
     if len(spoof_paths) < spoof_count:
-        raise ValueError(
-            f"Insufficient spoof images: {len(spoof_paths)} < {spoof_count}",
-        )
-
+        raise ValueError(f"Insufficient spoof images: {len(spoof_paths)} < {spoof_count}")
     # Random selection
     selected_live = np.random.choice(live_paths, live_count, replace=False)
     selected_spoof = np.random.choice(spoof_paths, spoof_count, replace=False)
@@ -329,11 +309,7 @@ def split_json_by_subject(
     for subject in val_subjects:
         val_paths.extend(subject_to_paths[subject])
 
-    print(
-        f"Subjects: {len(subjects)} total, {len(train_subjects)} train, {
-            len(val_subjects)
-        } val",
-    )
+    print(f"Subjects: {len(subjects)} total, {len(train_subjects)} train, {len(val_subjects)} val")
     print(f"Images: {len(train_paths)} train, {len(val_paths)} val")
 
     return train_paths, val_paths

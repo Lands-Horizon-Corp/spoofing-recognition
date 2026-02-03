@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 from app.core.config import settings
+
 from spoofdet.data_processing import get_transform_pipeline
 from spoofdet.efficient_net.model_utils import get_model
 
@@ -79,8 +80,4 @@ if __name__ == '__main__':
     detector = SpoofDetector()
 
     print('Model loaded successfully.')
-    print(
-        f"threshold: {settings.MODEL_THRESHOLD} target_size: {
-            settings.MODEL_TARGET_SIZE
-        }",
-    )
+    print( f"threshold: {settings.MODEL_THRESHOLD} target_size: {settings.MODEL_TARGET_SIZE}")
