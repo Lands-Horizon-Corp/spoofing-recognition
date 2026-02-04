@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import copy
 import time
+from collections.abc import Sized
 from typing import cast
-from typing import Sized
 
 import torch
 import torch.nn as nn

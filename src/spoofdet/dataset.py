@@ -66,16 +66,21 @@ class CelebASpoofDataset(Dataset):
             else:
                 c_h, c_w = img.shape[-2:]
                 img = F.center_crop(
-                    img, output_size=(
+                    img, output_size=[
                         min(c_h, c_w), min(c_h, c_w),
-                    ),
+                    ],
                 )
 
-        img = F.resize(img, size=self.buffer_size, antialias=True)
+        img = F.resize(
+            img, size=[
+                self.buffer_size,
+                self.buffer_size,
+            ], antialias=True,
+        )
         img = F.center_crop(
-            img, output_size=(
+            img, output_size=[
                 self.buffer_size, self.buffer_size,
-            ),
+            ],
         )
 
         img = img.to(torch.uint8)
@@ -86,7 +91,9 @@ class CelebASpoofDataset(Dataset):
             label_data, list,
         ) else label_data
 
-        assert isinstance(raw_label, int), f"Label must be int, got {type(raw_label)}"
+        assert isinstance(raw_label, int), f"Label must be int, got {
+            type(raw_label)
+        }"
         assert raw_label >= 0, f"Label must be non-negative, got {raw_label}"
         assert raw_label <= 1, f"Label must be in [0,1], got {raw_label}"
 

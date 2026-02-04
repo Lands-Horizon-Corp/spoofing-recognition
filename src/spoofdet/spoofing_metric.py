@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 import torch
 from torchmetrics import Metric
 
@@ -15,6 +13,8 @@ class SpoofingMetric(Metric):
     - Target 0 = Spoof / Attack
     - Preds  = Probabilities (0.0 to 1.0) of being Live
     """
+    preds: torch.Tensor
+    targets: torch.Tensor
 
     # These state variables will accumulate data across batches
     full_state_update: bool = False
@@ -27,7 +27,10 @@ class SpoofingMetric(Metric):
         # We register the state to accumulate predictions and targets over batches
         # dist_reduce_fx="cat" ensures data is concatenated correctly in distributed training
         self.add_state('preds', default=torch.tensor([]), dist_reduce_fx='cat')
-        self.add_state('targets', default=torch.tensor([]), dist_reduce_fx='cat')
+        self.add_state(
+            'targets', default=torch.tensor([]),
+            dist_reduce_fx='cat',
+        )
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         """
