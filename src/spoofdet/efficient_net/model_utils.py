@@ -17,6 +17,10 @@ from torchvision import models
 from torchvision.transforms import v2
 
 
+def invert_label(y):
+    return 1 - y
+
+
 def check_dataset_distribution(dataset: Subset):
     live_count = 0
     for i in range(len(dataset)):
@@ -493,7 +497,7 @@ def get_model(with_weights: bool = False) -> torch.nn.Module:
         in_features = classifier_layer.in_features
     else:
         # Handle other module types
-        in_features = 1408  # Default for EfficientNet-V2-S
+        in_features = 1280  # Default for EfficientNet-V2-S
     model.classifier[1] = nn.Linear(in_features, 2)
 
     return model

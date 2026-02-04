@@ -27,6 +27,7 @@ def get_transform_pipeline(
     gpu_transforms_train = v2.Compose(
         [
             v2.Resize((target_size, target_size), antialias=True),
+            v2.ToImage(),
             # v2.RandomResizedCrop(
             #     size=(target_size, target_size),
             #     scale=(0.7, 1.0),  # Zoom range
@@ -48,6 +49,7 @@ def get_transform_pipeline(
                 saturation=0.02,
                 hue=0,
             ),
+            v2.RandomGrayscale(p=0.1),
             # v2.Grayscale(num_output_channels=3),
             # v2.RandomGrayscale(p=0.1),
             # v2.GaussianBlur(kernel_size=3, sigma=(0.3, 2.0)),
@@ -66,6 +68,7 @@ def get_transform_pipeline(
     gpu_transforms_val = v2.Compose(
         [
             v2.Resize((target_size, target_size), antialias=True),
+            v2.ToImage(),
             v2.ToDtype(torch.float32, scale=True),
             v2.Normalize(mean=mean, std=std),
         ],

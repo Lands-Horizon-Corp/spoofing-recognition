@@ -9,3 +9,4 @@ yolov8n-cls.pt
 model.pt
 params.json
 .env
+fine_tune_results/

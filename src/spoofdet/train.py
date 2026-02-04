@@ -154,13 +154,13 @@ def train_model(
             secs = int(epoch_duration % 60)
 
             print(
-                f"Epoch [{epoch+1}/{epochs}] | \n"
-                f"Time: {mins}m {secs}s \n"
-                f"Train Loss: {avg_train_loss:.4f} | \n"
-                f"Val Loss: {avg_val_loss:.4f} | \n"
-                f"Val Precision: {prec_val * 100:.2f}% | \n"
-                f"Val Accuracy: {acc_val * 100:.2f}% | \n"
-                f"Val Recall: {rec_val * 100:.2f}% | \n"
+                f"Epoch [{epoch+1}/{epochs}] |"
+                f"Time: {mins}m {secs}s "
+                f"Train Loss: {avg_train_loss:.4f} |"
+                f"Val Loss: {avg_val_loss:.4f} | "
+                f"Val Precision: {prec_val * 100:.2f}% | "
+                f"Val Accuracy: {acc_val * 100:.2f}% | "
+                f"Val Recall: {rec_val * 100:.2f}% | "
                 f"Val F1: {f1_val * 100:.2f}%",
             )
             if scheduler is not None:

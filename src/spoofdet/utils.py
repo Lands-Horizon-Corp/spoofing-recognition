@@ -70,7 +70,8 @@ def save_results(
     train_loss_fig: Figure,
     precision_fig: Figure,
     params: dict,
-    spoof_fig: Figure,
+    spoof_fig: Figure | None = None,
+    save_path: str = 'train_results',
 ):
     """
     save all training results to a new directory inside train_results/
@@ -84,14 +85,14 @@ def save_results(
 
     """
 
-    save_path = Path('train_results')
+    final_save_path = Path(save_path)
     path_name = 'train'
     num = 0
 
-    save_path.mkdir(parents=True, exist_ok=True)
+    final_save_path.mkdir(parents=True, exist_ok=True)
 
     # create new dir if already exist
-    new_path = _create_save_new_path(save_path, path_name, num)
+    new_path = _create_save_new_path(final_save_path, path_name, num)
 
     print(f"Saving results to: {new_path}")
 
@@ -106,10 +107,11 @@ def save_results(
     with open(new_path / 'params.json', 'w', encoding='utf-8') as f:
         json.dump(params, f, indent=4)
 
-    spoof_fig.savefig(
-        new_path / 'spoof_type_analysis.png',
-        bbox_inches='tight',
-    )
+    if spoof_fig is not None:
+        spoof_fig.savefig(
+            new_path / 'spoof_type_analysis.png',
+            bbox_inches='tight',
+        )
 
 
 def _create_save_new_path(save_path: Path, path_name: str, num: int) -> Path:

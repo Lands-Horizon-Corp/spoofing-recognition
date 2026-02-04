@@ -10,6 +10,8 @@ TEST_JSON = BASE_DIR / 'dataset/CelebA_Spoof/metas/intra_test/test_label.json'
 
 BBOX_LOOKUP = BASE_DIR / 'bbox_lookup.json'
 
+REAL_VS_FAKE_PATH = BASE_DIR / 'dataset/archive/real_vs_fake/real-vs-fake'
+
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
