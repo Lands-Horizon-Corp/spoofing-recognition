@@ -51,10 +51,11 @@ async def detect_spoof_verbose(request: Request, response: Response, file: Uploa
         raise HTTPException(400, str(e))
 
     # 401 return a spoof no json
+    if result['live_confidence'] < 0.90:
+        raise HTTPException(403, 'Low live confidence detected')
     if result['is_spoof']:
         raise HTTPException(401, 'Spoof detected')
-    if result['live_confidence'] < 0.90:
-        raise HTTPException(403, 'Low confidence live detected')
+
     if result['live_confidence'] > 0.90:
         response.status_code = status.HTTP_204_NO_CONTENT
 
