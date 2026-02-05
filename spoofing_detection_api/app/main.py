@@ -4,26 +4,29 @@ from typing import Union
 
 from app.api.v1.routers import api_router
 from app.core.config import settings
+from app.core.security import limiter
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     # 1. Hide Swagger UI (/docs)
-    docs_url='/docs' if settings.IS_INDEVELOPMENT else None,
+    docs_url='/docs' if settings.APP_ENV == 'development' else None,
     # 2. Hide ReDoc (/redoc)
-    redoc_url='/redoc' if settings.IS_INDEVELOPMENT else None,
+    redoc_url='/redoc' if settings.APP_ENV == 'development' else None,
     # 3. (Optional) Hide the openapi.json schema file itself
-    openapi_url='/openapi.json' if settings.IS_INDEVELOPMENT else None,
+    openapi_url='/openapi.json' if settings.APP_ENV == 'development' else None,
 )
-origin = settings.cors_origins
+origin = settings.CORS_ALLOW_ORIGINS
+
+app.state.limiter = limiter
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origin,
     allow_credentials=True,
-    allow_methods=['*'],  # Allows all methods (GET, POST, etc.)
-    allow_headers=['*'],  # Allows all headers
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 

@@ -12,7 +12,17 @@ detector = SpoofDetector()
 
 
 async def predict_spoof(upload_file: UploadFile) -> dict:
-    """Orchestrates the prediction pipeline"""
+    """Orchestrates the prediction pipeline
+    Args:
+        upload_file (UploadFile): The uploaded image file to be analyzed for spoofing.
+    Returns:
+        dict: A dictionary containing the prediction results, including:
+            - 'is_spoof' (bool): Indicates whether the image is classified as a
+                                spoof based on model threshold and confidence scores
+                                or live_confidence is not above 0.90.
+            - 'live_confidence' (float): The confidence score for the image being live.
+            - 'spoof_confidence' (float): The confidence score for the image being a spoof.
+    """
 
     contents = await upload_file.read()
     try:
@@ -25,7 +35,7 @@ async def predict_spoof(upload_file: UploadFile) -> dict:
     prediction, live_confidence, spoof_confidence = detector.predict(image_np)
 
     return {
-        'is_spoof': bool(prediction),
+        'is_spoof': bool(prediction) or live_confidence < 0.90,
         'live_confidence': float(live_confidence),
         'spoof_confidence': float(spoof_confidence),
     }
