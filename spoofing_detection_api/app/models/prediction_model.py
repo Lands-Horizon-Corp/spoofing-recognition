@@ -79,6 +79,6 @@ if __name__ == '__main__':
     detector = SpoofDetector()
 
     print('Model loaded successfully.')
-    print(f"threshold: {settings.MODEL_THRESHOLD} target_size: {
-          settings.MODEL_TARGET_SIZE
-          }")
+    print(
+        f"threshold: {settings.MODEL_THRESHOLD}"
+        f" target_size: {settings.MODEL_TARGET_SIZE}")

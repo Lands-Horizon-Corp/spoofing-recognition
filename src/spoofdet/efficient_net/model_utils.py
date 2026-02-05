@@ -536,16 +536,16 @@ def diagnose_dataset_issue(json_path, root_dir, bbox_path):
             mismatches += 1
             if mismatches <= 5:  # Show first 5 mismatches
                 print(f"  MISMATCH: {path}")
-                print(f"    JSON says: {
-                      'Live' if json_label == 0 else 'Spoof'
-                      } {json_label}")
-                print(f"    Folder says: {folder_label_str} ({folder_label})")
+                # print(
+                #     f"JSON says: {'Live' if json_label == 0 else 'Spoof'
+                # } {json_label}")
+                # print(f"    Folder says: {folder_label_str} ({folder_label})")
 
-    print(f"\nFound {mismatches} mismatches in {
-          sample_size
-          } samples ({mismatches/sample_size*100:.1f}%)")
+    # print(f"\nFound {mismatches} mismatches in {
+    #       sample_size
+    #       } samples ({mismatches/sample_size*100:.1f}%)")
 
-    # 3. Check data leakage
+    # # 3. Check data leakage
     print('\nChecking data leakage...')
     train_subjects = set()
     val_subjects = set()

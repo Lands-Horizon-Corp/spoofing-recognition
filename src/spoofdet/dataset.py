@@ -91,9 +91,7 @@ class CelebASpoofDataset(Dataset):
             label_data, list,
         ) else label_data
 
-        assert isinstance(raw_label, int), f"Label must be int, got {
-            type(raw_label)
-        }"
+        assert isinstance(raw_label, int)
         assert raw_label >= 0, f"Label must be non-negative, got {raw_label}"
         assert raw_label <= 1, f"Label must be in [0,1], got {raw_label}"
 

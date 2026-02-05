@@ -27,7 +27,7 @@ def get_transform_pipeline(
     gpu_transforms_train = v2.Compose(
         [
             v2.Resize((target_size, target_size), antialias=True),
-            v2.ToImage(),
+            # v2.ToImage(),
             # v2.RandomResizedCrop(
             #     size=(target_size, target_size),
             #     scale=(0.7, 1.0),  # Zoom range
@@ -49,7 +49,7 @@ def get_transform_pipeline(
                 saturation=0.02,
                 hue=0,
             ),
-            v2.RandomGrayscale(p=0.1),
+            # v2.RandomGrayscale(p=0.1),
             # v2.Grayscale(num_output_channels=3),
             # v2.RandomGrayscale(p=0.1),
             # v2.GaussianBlur(kernel_size=3, sigma=(0.3, 2.0)),
@@ -68,7 +68,7 @@ def get_transform_pipeline(
     gpu_transforms_val = v2.Compose(
         [
             v2.Resize((target_size, target_size), antialias=True),
-            v2.ToImage(),
+            # v2.ToImage(),
             v2.ToDtype(torch.float32, scale=True),
             v2.Normalize(mean=mean, std=std),
         ],
@@ -127,9 +127,8 @@ def create_subset(
     if len(live_indices_relative) < num_live or len(spoof_indices_relative) < num_spoof:
         raise ValueError(
             f"Not enough data in this split to create size {total_size}. "
-            f"Available: {len(live_indices_relative)} Live, {
-                len(spoof_indices_relative)
-            } Spoof.",
+            f"Available: {len(live_indices_relative)} "
+            f"Live, {len(spoof_indices_relative)} Spoof."
         )
 
     # Random Sampling from relative indices
@@ -202,9 +201,9 @@ def get_data_for_training(
     )
 
     print(
-        f"Subject-split - Train: {
-            len(train_subject_paths)
-        }, Val: {len(val_subject_paths)}",
+        f"Subject-split -"
+        f" Train: {len(train_subject_paths)}"
+        f" Val: {len(val_subject_paths)}"
     )
 
     # 4. Balance by labels using JSON labels (not folder names)

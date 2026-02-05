@@ -34,7 +34,8 @@ def train_model(
     train_transforms: v2.Compose,
     val_transforms: v2.Compose,
     early_stopping_limit: int = 3,
-    scheduler: torch.optim.lr_scheduler._LRScheduler | None = None,
+    scheduler: torch.optim.lr_scheduler.CosineAnnealingLR |
+    torch.optim.lr_scheduler._LRScheduler | None = None,
 ) -> tuple[torch.nn.Module, dict[str, list]]:
     """
     Trains the given model using the provided data loaders, criterion, and optimizer.

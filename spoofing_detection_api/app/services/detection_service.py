@@ -19,9 +19,9 @@ async def predict_spoof(upload_file: UploadFile) -> dict:
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         image_np = np.array(image)
     except Exception as e:
-        raise ValueError(f"Invalid image file, file type detected: {
-                         upload_file.content_type
-                         }") from e
+        raise ValueError(
+            f"Invalid image file, file type detected:"
+            f" {upload_file.content_type}") from e
     prediction, live_confidence, spoof_confidence = detector.predict(image_np)
 
     return {
