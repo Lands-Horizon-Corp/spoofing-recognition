@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from typing import Union
 
-import uvicorn
 from app.api.v1.routers import api_router
 from app.core import utils
 from app.core.config import settings
@@ -31,21 +30,15 @@ async def lifespan(app: FastAPI):
         os.makedirs(os.path.dirname(settings.MODEL_PATH), exist_ok=True)
         os.makedirs(os.path.dirname(settings.PARAMS_PATH), exist_ok=True)
 
-        if os.path.isfile(settings.MODEL_PATH):
-            print('Model file found locally, skipping download.')
-        else:
-            await utils.download_file(
-                file_url=settings.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
-                file_path=settings.MODEL_PATH,
-            )
+        await utils.download_file(
+            file_url=settings.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
+            file_path=settings.MODEL_PATH,
+        )
 
-        if os.path.isfile(settings.PARAMS_PATH):
-            print('Params file found locally, skipping download.')
-        else:
-            await utils.download_file(
-                file_url=settings.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
-                file_path=settings.PARAMS_PATH,
-            )
+        await utils.download_file(
+            file_url=settings.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
+            file_path=settings.PARAMS_PATH,
+        )
     yield
     # Perform any shutdown tasks here (e.g., release resources)
     print('Shutting down the API...')
@@ -84,9 +77,9 @@ async def health_check():
     return {'status': 'ok'}
 
 
-def main():
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+# def main():
+#     uvicorn.run(app, host='0.0.0.0', port=8000)
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()

@@ -11,4 +11,5 @@ services:
     volumes:
       - ./spoofing_detection_api/:/code/spoofing_detection_api
       - ./src:/code/src
+      - ./.env:/code/.env
     command: uvicorn spoofing_detection_api.app.main:app --host 0.0.0.0 --port 8001 --reload

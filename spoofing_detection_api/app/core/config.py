@@ -59,6 +59,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def set_cors_origins(self):
+        print(f'APP_ENV: {self.APP_ENV}')
         if self.APP_ENV == 'development':
             self.CORS_ALLOW_ORIGINS = allowed_origins_production + allowed_origins_development
         elif self.APP_ENV == 'production':
@@ -71,6 +72,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = str(BASE_DIR / '.env')
 
+
+print(str(BASE_DIR / '.env'))
 
 settings = Settings()
 

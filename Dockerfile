@@ -6,6 +6,7 @@ WORKDIR /code
 # 2. Copy dependency files first (for caching)
 COPY ./requirements.txt /code/requirements.txt
 COPY ./pyproject.toml /code/pyproject.toml
+COPY ./.env /code/.env
 
 
 # 3. Install dependencies
