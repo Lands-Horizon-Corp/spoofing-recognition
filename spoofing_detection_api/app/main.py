@@ -27,8 +27,6 @@ async def lifespan(app: FastAPI):
     # Perform any startup tasks here (e.g., load model, initialize resources)
     print('Starting up the API...')
 
-    yield
-
     if os.path.isfile(settings.PARAMS_PATH) and os.path.isfile(settings.MODEL_PATH):
         print('Model and params file found locally, loading params.')
     else:
@@ -41,7 +39,7 @@ async def lifespan(app: FastAPI):
             file_url=settings.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
             file_path=settings.PARAMS_PATH,
         )
-
+    yield
     # Perform any shutdown tasks here (e.g., release resources)
     print('Shutting down the API...')
 
