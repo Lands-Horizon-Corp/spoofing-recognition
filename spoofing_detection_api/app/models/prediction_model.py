@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
+from app.core.config import ModelConfig
 from app.core.config import settings
 from spoofdet.data_processing import get_transform_pipeline
 from spoofdet.efficient_net.model_utils import get_model
@@ -25,6 +26,7 @@ class SpoofDetector:
             return
         self.model = self._load_model()
         self.version = '1.0'
+        self.config = ModelConfig()
         self._initialized = True
 
     def _load_model(self):
@@ -44,7 +46,7 @@ class SpoofDetector:
         with torch.no_grad():
             outputs = self.model(processed)
             probs = torch.sigmoid(outputs)
-            prediction = (probs[:, 1] > settings.MODEL_THRESHOLD).long()
+            prediction = (probs[:, 1] > self.config.THRESHOLD).long()
             spoof_confidence = probs[:, 1].item()
             live_confidence = probs[:, 0].item()
         return prediction, live_confidence, spoof_confidence
@@ -53,7 +55,7 @@ class SpoofDetector:
         assert input_image.dtype == np.uint8, 'Image dtype must be uint8'
         _, gpu_transform_val = get_transform_pipeline(
             device=self.device,
-            target_size=settings.MODEL_TARGET_SIZE,
+            target_size=self.config.TARGET_SIZE,
         )
         if isinstance(input_image, np.ndarray):
             # Convert NumPy (H, W, C) -> Tensor (C, H, W)
@@ -80,5 +82,5 @@ if __name__ == '__main__':
 
     print('Model loaded successfully.')
     print(
-        f"threshold: {settings.MODEL_THRESHOLD}"
-        f" target_size: {settings.MODEL_TARGET_SIZE}")
+        f"threshold: {detector.config.THRESHOLD}"
+        f" target_size: {detector.config.TARGET_SIZE}")
