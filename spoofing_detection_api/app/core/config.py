@@ -61,12 +61,14 @@ class Settings(BaseSettings):
     def set_cors_origins(self):
         print(f'APP_ENV: {self.APP_ENV}')
         if self.APP_ENV == 'development':
-            self.CORS_ALLOW_ORIGINS = allowed_origins_production + allowed_origins_development
+            self.CORS_ALLOW_ORIGINS = allowed_origins_development + allowed_origins_production
         elif self.APP_ENV == 'production':
             self.CORS_ALLOW_ORIGINS = allowed_origins_production
+        elif self.APP_ENV == 'staging':
+            self.CORS_ALLOW_ORIGINS = allowed_origins_development + allowed_origins_production
         else:
             raise ValueError(
-                'APP_ENV must be either "development" or "production".')
+                'APP_ENV must be either "development", "production", or "staging".')
         return self
 
     class Config:

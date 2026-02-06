@@ -47,11 +47,14 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     lifespan=lifespan,
     # 1. Hide Swagger UI (/docs)
-    docs_url='/docs' if settings.APP_ENV == 'development' else None,
+    docs_url='/docs' if settings.APP_ENV == 'development'
+    or settings.APP_ENV == 'staging' else None,
     # 2. Hide ReDoc (/redoc)
-    redoc_url='/redoc' if settings.APP_ENV == 'development' else None,
+    redoc_url='/redoc' if settings.APP_ENV == 'development'
+    or settings.APP_ENV == 'staging' else None,
     # 3. (Optional) Hide the openapi.json schema file itself
-    openapi_url='/openapi.json' if settings.APP_ENV == 'development' else None,
+    openapi_url='/openapi.json' if settings.APP_ENV == 'development'
+    or settings.APP_ENV == 'staging' else None,
 )
 
 
