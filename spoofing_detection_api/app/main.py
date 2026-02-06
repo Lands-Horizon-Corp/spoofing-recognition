@@ -12,10 +12,10 @@ from fastapi import FastAPI
 from fastapi.concurrency import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
-SPOOFING_MODEL_DOWNLOADS_URL_ENV = os.getenv(
-    'SPOOFING_MODEL_DOWNLOADS_URL_ENV')
-SPOOFING_PARAMS_DOWNLOAD_URL_ENV = os.getenv(
-    'SPOOFING_PARAMS_DOWNLOAD_URL_ENV')
+# SPOOFING_MODEL_DOWNLOADS_URL_ENV = os.getenv(
+#     'SPOOFING_MODEL_DOWNLOADS_URL_ENV')
+# SPOOFING_PARAMS_DOWNLOAD_URL_ENV = os.getenv(
+#     'SPOOFING_PARAMS_DOWNLOAD_URL_ENV')
 
 
 @asynccontextmanager
