@@ -31,6 +31,8 @@ async def lifespan(app: FastAPI):
         print('Model and params file found locally, loading params.')
     else:
         print('Params file not found at, downloading needed files.')
+        os.makedirs(os.path.dirname(settings.MODEL_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(settings.PARAMS_PATH), exist_ok=True)
         await utils.download_file(
             file_url=settings.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
             file_path=settings.MODEL_PATH,
