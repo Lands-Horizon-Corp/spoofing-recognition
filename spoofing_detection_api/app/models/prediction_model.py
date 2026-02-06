@@ -24,12 +24,15 @@ class SpoofDetector:
     def __init__(self):
         if self._initialized:
             return
-        self.model = self._load_model()
+        self.model = None
         self.version = '1.0'
         self.config = ModelConfig()
         self._initialized = True
 
     def _load_model(self):
+        if self.model is None:
+            self.model = torch.load(
+                settings.MODEL_PATH, map_location=self.device)
         model = get_model()
         model.to(device=self.device)
         model.load_state_dict(
@@ -39,11 +42,14 @@ class SpoofDetector:
             ),
         )
         model.eval()
-        return model
+        self.model = model
+        return self.model
 
     def predict(self, image: np.ndarray) -> tuple:
+        self._load_model()
         processed = self.preprocess(image)
         with torch.no_grad():
+            assert self.model is not None, 'Model must be loaded before prediction'
             outputs = self.model(processed)
             probs = torch.sigmoid(outputs)
             prediction = (probs[:, 1] > self.config.THRESHOLD).long()
