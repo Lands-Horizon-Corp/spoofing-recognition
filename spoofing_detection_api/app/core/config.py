@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
+import requests  # type: ignore
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
@@ -45,6 +47,21 @@ allowed_origins_development = [
 ]
 
 
+def download_file(file_url: str, file_path: str):
+
+    try:
+        response = requests.get(file_url, stream=True)
+        response.raise_for_status()
+
+        with open(file_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f'Model downloaded successfully to {file_path}')
+    except requests.exceptions.RequestException as e:
+        print(f'Error downloading model: {e}')
+
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = 'Spoof Detection API'
     APP_ENV: str = 'production'
@@ -55,10 +72,25 @@ class Settings(BaseSettings):
     MODEL_THRESHOLD: float = 0.5
     API_V1_PREFIX: str = '/api/v1'
     MODEL_TARGET_SIZE: int = 320
+    SPOOFING_MODEL_DOWNLOADS_URL_ENV: str = ''
+    SPOOFING_PARAMS_DOWNLOAD_URL_ENV: str = ''
 
     @model_validator(mode='after')
     def load_model_params(self):
         try:
+            if os.path.isfile(self.PARAMS_PATH) and os.path.isfile(self.MODEL_PATH):
+                print('Model and params file found locally, loading params.')
+            else:
+                print('Params file not found at, downloading needed files.')
+                download_file(
+                    file_url=self.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
+                    file_path=self.MODEL_PATH,
+                )
+                download_file(
+                    file_url=self.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
+                    file_path=self.PARAMS_PATH,
+                )
+
             with open(self.PARAMS_PATH) as f:
                 params = json.load(f)
                 self.MODEL_THRESHOLD = params.get(
@@ -69,8 +101,10 @@ class Settings(BaseSettings):
                     'target_size',
                     self.MODEL_TARGET_SIZE,
                 )
-        except FileNotFoundError:
-            print('Params file not found, using default parameters.')
+
+        except Exception as e:
+            print(f'Error loading model parameters: {e}')
+        # NOTE: add feature for deleting old files
         return self
 
     @model_validator(mode='after')
