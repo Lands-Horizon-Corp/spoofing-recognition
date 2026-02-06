@@ -8,7 +8,7 @@ import requests  # type: ignore
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 
 allowed_origins_production = [
@@ -67,8 +67,9 @@ class Settings(BaseSettings):
     APP_ENV: str = 'production'
     CORS_ALLOW_ORIGINS: list[str] = []
 
-    MODEL_PATH: str = str(BASE_DIR / 'models/model.pt')
-    PARAMS_PATH: str = str(BASE_DIR / 'models/params.json')
+    MODEL_PATH: str = str(BASE_DIR / 'spoofing_detection_api/models/model.pt')
+    PARAMS_PATH: str = str(
+        BASE_DIR / 'spoofing_detection_api/models/params.json')
     MODEL_THRESHOLD: float = 0.5
     API_V1_PREFIX: str = '/api/v1'
     MODEL_TARGET_SIZE: int = 320
@@ -124,4 +125,4 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-print(f"Looking for .env at: {str(BASE_DIR / '.env')}")
+print(f"Looking for hahahahah .env at: {str(BASE_DIR / '.env')}")
