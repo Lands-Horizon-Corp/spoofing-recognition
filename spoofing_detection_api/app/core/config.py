@@ -53,30 +53,9 @@ class Settings(BaseSettings):
     MODEL_PATH: str = str(BASE_DIR / 'spoofing_detection_api/models/model.pt')
     PARAMS_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/params.json')
-    MODEL_THRESHOLD: float = 0.5
     API_V1_PREFIX: str = '/api/v1'
-    MODEL_TARGET_SIZE: int = 320
     SPOOFING_MODEL_DOWNLOADS_URL_ENV: str = ''
     SPOOFING_PARAMS_DOWNLOAD_URL_ENV: str = ''
-
-    @model_validator(mode='after')
-    def load_model_params(self):
-        try:
-            with open(self.PARAMS_PATH) as f:
-                params = json.load(f)
-                self.MODEL_THRESHOLD = params.get(
-                    'threshold',
-                    self.MODEL_THRESHOLD,
-                )
-                self.MODEL_TARGET_SIZE = params.get(
-                    'target_size',
-                    self.MODEL_TARGET_SIZE,
-                )
-
-        except Exception as e:
-            print(f'Error loading model parameters: {e}')
-        # NOTE: add feature for deleting old files
-        return self
 
     @model_validator(mode='after')
     def set_cors_origins(self):
@@ -95,4 +74,26 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-print(f"Looking for hahahahah .env at: {str(BASE_DIR / '.env')}")
+
+class ModelConfig(BaseSettings):
+    THRESHOLD: float = 0.5
+    TARGET_SIZE: int = 320
+
+    @model_validator(mode='after')
+    def load_model_params(self, path: str = settings.PARAMS_PATH):
+        try:
+            with open(path) as f:
+                params = json.load(f)
+                self.THRESHOLD = params.get(
+                    'threshold',
+                    self.THRESHOLD,
+                )
+                self.TARGET_SIZE = params.get(
+                    'target_size',
+                    self.TARGET_SIZE,
+                )
+
+        except Exception as e:
+            print(f'Error loading model parameters: {e}')
+        # NOTE: add feature for deleting old files
+        return self

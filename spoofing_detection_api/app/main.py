@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import Union
 
+import uvicorn
 from app.api.v1.routers import api_router
 from app.core import utils
 from app.core.config import settings
@@ -11,15 +12,10 @@ from fastapi import FastAPI
 from fastapi.concurrency import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    # 1. Hide Swagger UI (/docs)
-    docs_url='/docs' if settings.APP_ENV == 'development' else None,
-    # 2. Hide ReDoc (/redoc)
-    redoc_url='/redoc' if settings.APP_ENV == 'development' else None,
-    # 3. (Optional) Hide the openapi.json schema file itself
-    openapi_url='/openapi.json' if settings.APP_ENV == 'development' else None,
-)
+SPOOFING_MODEL_DOWNLOADS_URL_ENV = os.getenv(
+    'SPOOFING_MODEL_DOWNLOADS_URL_ENV')
+SPOOFING_PARAMS_DOWNLOAD_URL_ENV = os.getenv(
+    'SPOOFING_PARAMS_DOWNLOAD_URL_ENV')
 
 
 @asynccontextmanager
@@ -31,19 +27,39 @@ async def lifespan(app: FastAPI):
         print('Model and params file found locally, loading params.')
     else:
         print('Params file not found at, downloading needed files.')
+
         os.makedirs(os.path.dirname(settings.MODEL_PATH), exist_ok=True)
         os.makedirs(os.path.dirname(settings.PARAMS_PATH), exist_ok=True)
-        await utils.download_file(
-            file_url=settings.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
-            file_path=settings.MODEL_PATH,
-        )
-        await utils.download_file(
-            file_url=settings.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
-            file_path=settings.PARAMS_PATH,
-        )
+
+        if os.path.isfile(settings.MODEL_PATH):
+            print('Model file found locally, skipping download.')
+        else:
+            await utils.download_file(
+                file_url=settings.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
+                file_path=settings.MODEL_PATH,
+            )
+
+        if os.path.isfile(settings.PARAMS_PATH):
+            print('Params file found locally, skipping download.')
+        else:
+            await utils.download_file(
+                file_url=settings.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
+                file_path=settings.PARAMS_PATH,
+            )
     yield
     # Perform any shutdown tasks here (e.g., release resources)
     print('Shutting down the API...')
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    lifespan=lifespan,
+    # 1. Hide Swagger UI (/docs)
+    docs_url='/docs' if settings.APP_ENV == 'development' else None,
+    # 2. Hide ReDoc (/redoc)
+    redoc_url='/redoc' if settings.APP_ENV == 'development' else None,
+    # 3. (Optional) Hide the openapi.json schema file itself
+    openapi_url='/openapi.json' if settings.APP_ENV == 'development' else None,
+)
 
 
 origin = settings.CORS_ALLOW_ORIGINS
@@ -66,3 +82,11 @@ app.include_router(api_router, prefix='/api/v1')
 async def health_check():
     """Health check endpoint to verify that the API is running."""
     return {'status': 'ok'}
+
+
+def main():
+    uvicorn.run(app, host='0.0.0.0', port=8000)
+
+
+if __name__ == '__main__':
+    main()
