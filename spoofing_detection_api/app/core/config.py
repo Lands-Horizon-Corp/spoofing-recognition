@@ -48,7 +48,7 @@ allowed_origins_development = [
 
 
 def download_file(file_url: str, file_path: str):
-
+    print(f'Downloading file to {file_path}...')
     try:
         response = requests.get(file_url, stream=True)
         response.raise_for_status()
