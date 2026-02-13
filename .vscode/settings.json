@@ -4,6 +4,7 @@
     "./src",
     "./spoofing_detection_api"
   ],
+  "notebook.formatOnSave.enabled": true,
   "[python]": {
     "editor.defaultFormatter": "ms-python.autopep8",
     "editor.formatOnSave": true,

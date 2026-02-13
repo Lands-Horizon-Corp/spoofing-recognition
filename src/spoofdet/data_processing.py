@@ -44,17 +44,17 @@ def get_transform_pipeline(
             # ),
             v2.ToDtype(torch.float32, scale=True),
             v2.ColorJitter(
-                brightness=0.05,
-                contrast=0.05,
-                saturation=0.02,
+                brightness=0.1,
+                contrast=0.1,
+                saturation=0.2,
                 hue=0,
             ),
-            # v2.RandomGrayscale(p=0.1),
+            v2.RandomGrayscale(p=0.1),
             # v2.Grayscale(num_output_channels=3),
             # v2.RandomGrayscale(p=0.1),
-            # v2.GaussianBlur(kernel_size=3, sigma=(0.3, 2.0)),
+            # v2.GaussianBlur(kernel_size=3, sigma=(0.2, 2.0)),
             # v2.GaussianNoise(sigma=0.02),
-            # v2.RandomErasing(p=0.2),
+            v2.RandomErasing(p=0.2),
             v2.Normalize(mean=mean, std=std),
             # v2.RandomChoice(
             #     [

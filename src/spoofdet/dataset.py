@@ -84,19 +84,22 @@ class CelebASpoofDataset(Dataset):
         )
 
         img = img.to(torch.uint8)
+        # label_data = self.label_dict[rel_path]
+
+        # # Get the raw label (likely Spoof Type: 0=Live, >0=Spoof)
+        # raw_label = label_data[43] if isinstance(
+        #     label_data, list,
+        # ) else label_data
+
+        # label = torch.tensor(raw_label, dtype=torch.long)
+
+        # 5. Binary label: 0 = live, 1 = spoof (any non-zero spoof type)
         label_data = self.label_dict[rel_path]
-
-        # Get the raw label (likely Spoof Type: 0=Live, >0=Spoof)
         raw_label = label_data[43] if isinstance(
-            label_data, list,
-        ) else label_data
-
-        assert isinstance(raw_label, int)
-        assert raw_label >= 0, f"Label must be non-negative, got {raw_label}"
-        assert raw_label <= 1, f"Label must be in [0,1], got {raw_label}"
-
-        # Convert to binary: 0 (Live) vs 1 (Spoof)
-        label = torch.tensor(raw_label, dtype=torch.long)
+            label_data, list) else label_data
+        binary_label = 1 if raw_label > 0 else 0
+        # BCEWithLogitsLoss expects float
+        label = torch.tensor(binary_label, dtype=torch.float32)
 
         return img, label
 
