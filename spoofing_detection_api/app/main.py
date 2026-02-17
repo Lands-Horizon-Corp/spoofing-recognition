@@ -11,10 +11,13 @@ from fastapi import FastAPI
 from fastapi.concurrency import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
+# from src.spoofdet.verify_memory import measure_time_and_memory
 # SPOOFING_MODEL_DOWNLOADS_URL_ENV = os.getenv(
 #     'SPOOFING_MODEL_DOWNLOADS_URL_ENV')
 # SPOOFING_PARAMS_DOWNLOAD_URL_ENV = os.getenv(
 #     'SPOOFING_PARAMS_DOWNLOAD_URL_ENV')
+
+# measure_time_and_memory()
 
 
 @asynccontextmanager

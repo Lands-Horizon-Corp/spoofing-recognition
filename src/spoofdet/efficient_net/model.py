@@ -173,8 +173,8 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         f1_perclass = self.test_f1_perclass.compute()
         confmat = self.test_confmat.compute()                   # 2x2 tensor
         if rec_perclass.numel() < 2:
-            print(f" Unexpected per‑class tensor shape: {
-                  rec_perclass.shape}")
+            print(f" Unexpected per‑class tensor shape: "
+                  f"{rec_perclass.shape}")
             return
 
         # ----- 3. Anti‑spoofing specific metrics -----
