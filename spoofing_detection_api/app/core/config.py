@@ -51,11 +51,13 @@ class Settings(BaseSettings):
     CORS_ALLOW_ORIGINS: list[str] = []
 
     MODEL_PATH: str = str(BASE_DIR / 'spoofing_detection_api/models/model.pt')
+
     PARAMS_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/params.json')
     API_V1_PREFIX: str = '/api/v1'
     SPOOFING_MODEL_DOWNLOADS_URL_ENV: str = ''
     SPOOFING_PARAMS_DOWNLOAD_URL_ENV: str = ''
+    THRESHOLD: float = 0.5
 
     @model_validator(mode='after')
     def set_cors_origins(self):
@@ -102,3 +104,6 @@ class ModelConfig(BaseSettings):
             print(f'Error loading model parameters: {e}')
         # NOTE: add feature for deleting old files
         return self
+
+
+model_config = ModelConfig()

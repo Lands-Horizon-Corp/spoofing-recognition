@@ -10,19 +10,21 @@ from app.core.security import limiter
 from fastapi import FastAPI
 from fastapi.concurrency import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from spoofdet.verify_memory import print_memory_usage
 
-# from src.spoofdet.verify_memory import measure_time_and_memory
 # SPOOFING_MODEL_DOWNLOADS_URL_ENV = os.getenv(
 #     'SPOOFING_MODEL_DOWNLOADS_URL_ENV')
 # SPOOFING_PARAMS_DOWNLOAD_URL_ENV = os.getenv(
 #     'SPOOFING_PARAMS_DOWNLOAD_URL_ENV')
 
 # measure_time_and_memory()
+print_memory_usage('Starting up the API...')
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Perform any startup tasks here (e.g., load model, initialize resources)
+    print_memory_usage('Startup Complete')
     print('Starting up the API...')
 
     if os.path.isfile(settings.PARAMS_PATH) and os.path.isfile(settings.MODEL_PATH):

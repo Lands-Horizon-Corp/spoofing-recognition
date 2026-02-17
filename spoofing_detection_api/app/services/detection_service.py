@@ -32,11 +32,10 @@ async def predict_spoof(upload_file: UploadFile) -> dict:
         raise ValueError(
             f"Invalid image file, file type detected:"
             f" {upload_file.content_type}") from e
-    prediction, live_confidence, spoof_confidence = detector.predict(image_np)
+    prediction, spoof_confidence = detector.predict(image_np)
 
     return {
-        'is_spoof': bool(prediction) or live_confidence < 0.90,
-        'live_confidence': float(live_confidence),
+        'is_spoof': bool(prediction),
         'spoof_confidence': float(spoof_confidence),
     }
 
