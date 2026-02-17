@@ -17,6 +17,40 @@ from torchvision import models
 from torchvision.transforms import v2
 
 
+def freeze_stages(model: nn.Module, frozen_stages: int):
+    """Freezes the initial layers of the model based on frozen_stages"""
+    features = list(cast(nn.Module, model.features).children())
+    for i in range(min(frozen_stages, len(features))):
+        for param in features[i].parameters():
+            param.requires_grad = False
+
+    print(
+        f"Frozen layers: {min(frozen_stages, len(features))}",
+
+    )
+
+
+def adaptive_batch_norm(model, val_transforms, data_loader, device, num_batches=100, momentum=0.1):
+    """Adapts the batch normalization layers of the model using a subset of the training data"""
+
+    model.train()
+    # reset running mean and variance for all batch normalization layers
+    for module in model.modules():
+        if isinstance(module, (nn.BatchNorm2d, nn.SyncBatchNorm)):
+            module.reset_running_stats()
+            module.momentum = momentum
+
+    with torch.no_grad():
+
+        for i, (imgs, _) in enumerate(data_loader):
+            if i >= num_batches:
+                break
+            imgs = imgs.to(device)
+            imgs = val_transforms(imgs)
+            model(imgs)
+    print('Adaptive BatchNorm completed')
+
+
 def invert_label(y):
     return 1 - y
 

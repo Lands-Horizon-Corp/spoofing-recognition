@@ -41,6 +41,7 @@ class SpoofDetector:
                 map_location=self.device,
             ),
         )
+        model = torch.compile(model, backend='inductor')
         model.eval()
         self.model = model
         return self.model

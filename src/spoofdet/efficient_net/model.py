@@ -6,6 +6,8 @@ import lightning as L
 import matplotlib.pyplot as plt
 import torch
 from lightning.pytorch.loggers import TensorBoardLogger
+from spoofdet.efficient_net.model_utils import adaptive_batch_norm
+from spoofdet.efficient_net.model_utils import freeze_stages
 from torch import nn
 from torchmetrics.classification import BinaryAccuracy
 from torchmetrics.classification import BinaryConfusionMatrix
@@ -21,12 +23,12 @@ from torchvision.transforms import v2
 
 class EfficientNetSpoofingDetection(L.LightningModule):
     def __init__(self,
-                 backbone_lr,
-                 head_lr,
-                 val_transforms,
-                 train_transforms,
-                 train_data_loader,
-                 criterion):
+                 backbone_lr=1e-5,
+                 head_lr=3e-4,
+                 val_transforms=None,
+                 train_transforms=None,
+                 train_data_loader=None,
+                 criterion=torch.nn.BCEWithLogitsLoss()):
         super().__init__()
         self.save_hyperparameters(
             ignore=['val_transforms',
@@ -42,8 +44,8 @@ class EfficientNetSpoofingDetection(L.LightningModule):
                     'test_f1_perclass',
                     'test_confmat'])
         self.train_data_loader = train_data_loader
-        self.train_transforms: v2.Compose = train_transforms
-        self.val_transforms: v2.Compose = val_transforms
+        self.train_transforms: v2.Compose | None = train_transforms
+        self.val_transforms: v2.Compose | None = val_transforms
         self.criterion: nn.Module = criterion
         self.backbone_lr: float = backbone_lr
         self.head_lr: float = head_lr
@@ -87,7 +89,8 @@ class EfficientNetSpoofingDetection(L.LightningModule):
     def training_step(self, batch, batch_idx):
         img, label = batch
         label = label.view(-1, 1).float()
-        img = self.train_transforms(img)
+        if self.train_transforms is not None:
+            img = self.train_transforms(img)
         output = self.forward(img)
         loss = self.criterion(output, label)
         self.log('train_loss', loss,  prog_bar=True, sync_dist=True)
@@ -96,7 +99,8 @@ class EfficientNetSpoofingDetection(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         img, label = batch
         label = label.view(-1, 1).float()
-        img = self.val_transforms(img)
+        if self.val_transforms is not None:
+            img = self.val_transforms(img)
         output = self.forward(img)
         loss = self.criterion(output, label)
         self.log('val_loss', loss, on_epoch=True,
@@ -119,7 +123,8 @@ class EfficientNetSpoofingDetection(L.LightningModule):
     def test_step(self, batch, batch_idx):
         images, labels = batch
         labels = labels.view(-1, 1).float()   # [B, 1]
-        images = self.val_transforms(images)  # [B, C, H, W]
+        if self.val_transforms is not None:
+            images = self.val_transforms(images)  # [B, C, H, W]
         logits = self(images)                 # [B, 1]
         loss = self.criterion(logits, labels)
 
@@ -147,7 +152,7 @@ class EfficientNetSpoofingDetection(L.LightningModule):
     def on_test_epoch_end(self) -> None:
         # ----- 1. Overall scalar metrics -----
         if self._test_total_samples == 0:
-            print('⚠️ No test samples processed – skipping test metrics.')
+            print('No test samples processed – skipping test metrics.')
             return
         acc = self.test_acc.compute()
         prec = self.test_precision.compute()
@@ -168,7 +173,7 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         f1_perclass = self.test_f1_perclass.compute()
         confmat = self.test_confmat.compute()                   # 2x2 tensor
         if rec_perclass.numel() < 2:
-            print(f"⚠️ Unexpected per‑class tensor shape: {
+            print(f" Unexpected per‑class tensor shape: {
                   rec_perclass.shape}")
             return
 
@@ -237,37 +242,3 @@ def get_model(with_weights: bool = False, device: torch.device = torch.device('c
     model.classifier[1] = nn.Linear(in_features, 2)
 
     return model.to(device)
-
-
-def freeze_stages(model: nn.Module, frozen_stages: int):
-    """Freezes the initial layers of the model based on frozen_stages"""
-    total_stages_unfreeze = 7 - frozen_stages
-    features = list(cast(nn.Module, model.features).children())
-    for i in range(total_stages_unfreeze):
-        for param in features[i].parameters():
-            param.requires_grad = False
-
-    print(
-        f"Unfrozen layers: {total_stages_unfreeze}",
-    )
-
-
-def adaptive_batch_norm(model, val_transforms, data_loader, device, num_batches=100, momentum=0.1):
-    """Adapts the batch normalization layers of the model using a subset of the training data"""
-
-    model.train()
-    # reset running mean and variance for all batch normalization layers
-    for module in model.modules():
-        if isinstance(module, (nn.BatchNorm2d, nn.SyncBatchNorm)):
-            module.reset_running_stats()
-            module.momentum = momentum
-
-    with torch.no_grad():
-
-        for i, (imgs, _) in enumerate(data_loader):
-            if i >= num_batches:
-                break
-            imgs = imgs.to(device)
-            imgs = val_transforms(imgs)
-            model(imgs)
-    print('Adaptive BatchNorm completed')
