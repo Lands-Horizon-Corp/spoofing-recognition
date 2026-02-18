@@ -18,16 +18,57 @@ from torchvision.transforms import v2
 
 
 def freeze_stages(model: nn.Module, frozen_stages: int):
-    """Freezes the initial layers of the model based on frozen_stages"""
-    features = list(cast(nn.Module, model.features).children())
-    for i in range(min(frozen_stages, len(features))):
-        for param in features[i].parameters():
-            param.requires_grad = False
+    """
+    Freezes the initial layers of the model.
+    Robust to structure (Torchvision vs Timm) and Pylance type checking.
+    """
 
-    print(
-        f"Frozen layers: {min(frozen_stages, len(features))}",
+    # 1. Handle Timm Models (MobileNetV4, etc.)
+    if hasattr(model, 'blocks'):
+        print('Detected Timm model structure.')
 
-    )
+        # Freeze Stem (if present)
+        if hasattr(model, 'conv_stem'):
+            for param in cast(nn.Module, model.conv_stem).parameters():
+                param.requires_grad = False
+
+        if hasattr(model, 'bn1'):
+            for param in cast(nn.Module, model.bn1).parameters():
+                param.requires_grad = False
+
+        # Freeze Blocks
+        # We explicitly iterate over children to ensure they are Modules
+        blocks = list(cast(nn.ModuleList, model.blocks).children())
+        limit = min(frozen_stages, len(blocks))
+
+        for i in range(limit):
+            block = blocks[i]
+            # SAFETY CHECK: Ensure it is actually a Module before accessing parameters
+            if isinstance(block, nn.Module):
+                for param in block.parameters():
+                    param.requires_grad = False
+            else:
+
+                print(f"Warning: Block {i} is not an nn.Module.")
+
+        print(f"Frozen Timm backbone: Stem + first {limit} blocks")
+
+    # 2. Handle Torchvision Models (EfficientNet, ResNet, etc.)
+    elif hasattr(model, 'features'):
+        print('Detected Torchvision model structure.')
+        features = list(cast(nn.ModuleList, model.features).children())
+        limit = min(frozen_stages, len(features))
+
+        for i in range(limit):
+            feature = features[i]
+            if isinstance(feature, nn.Module):
+                for param in feature.parameters():
+                    param.requires_grad = False
+
+        print(f"Frozen Torchvision features: first {limit} layers")
+
+    else:
+        print('Warning: Model structure unknown. Skipping freeze.')
 
 
 def adaptive_batch_norm(model, val_transforms, data_loader, device, num_batches=100, momentum=0.1):

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from typing import cast
+from typing import Literal
 
 import lightning as L
 import matplotlib.pyplot as plt
+import timm
 import torch
 from lightning.pytorch.loggers import TensorBoardLogger
 from spoofdet.efficient_net.model_utils import adaptive_batch_norm
@@ -23,12 +25,15 @@ from torchvision.transforms import v2
 
 class EfficientNetSpoofingDetection(L.LightningModule):
     def __init__(self,
+                 backbone_model,
                  backbone_lr=1e-5,
                  head_lr=3e-4,
                  val_transforms=None,
                  train_transforms=None,
                  train_data_loader=None,
-                 criterion=torch.nn.BCEWithLogitsLoss()):
+                 criterion=torch.nn.BCEWithLogitsLoss(),
+                 target_size=224,
+                 frozen_stages=3):
         super().__init__()
         self.save_hyperparameters(
             ignore=['val_transforms',
@@ -42,19 +47,28 @@ class EfficientNetSpoofingDetection(L.LightningModule):
                     'test_precision_perclass',
                     'test_recall_perclass',
                     'test_f1_perclass',
-                    'test_confmat'])
+                    'test_confmat',
+                    'frozen_stages'])
+        self.backbone_model: Literal['efficientnet_v2_s',
+                                     'mobile_net_v4'] = backbone_model
         self.train_data_loader = train_data_loader
         self.train_transforms: v2.Compose | None = train_transforms
         self.val_transforms: v2.Compose | None = val_transforms
         self.criterion: nn.Module = criterion
         self.backbone_lr: float = backbone_lr
         self.head_lr: float = head_lr
-        self.backbone: nn.Module = models.efficientnet_v2_s(
-            weights=models.EfficientNet_V2_S_Weights.DEFAULT,
-        )
-        self.in_features: int = cast(
-            nn.Linear, self.backbone.classifier[1]).in_features
-        self.backbone.classifier[1] = nn.Identity()
+        self.target_size: int = target_size
+        self.frozen_stages: int = frozen_stages
+        self.backbone: nn.Module = get_model(
+            model_name=backbone_model, with_weights=True, device=self.device)
+        self.backbone.eval()
+        with torch.no_grad():
+            dummy_input = torch.zeros(
+                1, 3, target_size, target_size).to(self.device)
+            # We move backbone to device temporarily if needed, though usually CPU is fine for init
+            output = self.backbone(dummy_input)
+            self.in_features = output.shape[1]
+        self.backbone.train()  # Set backbone back to train mode after feature extraction
         self.head = nn.Sequential(
             nn.Dropout(0.3),
             nn.Linear(self.in_features, 256),
@@ -76,15 +90,19 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         self.test_confmat = BinaryConfusionMatrix()
         self._test_total_samples = 0
 
+        # Validation metrics to monitor performance with 0.05 threshold
+        self.val_acc = BinaryAccuracy()
+        self.val_f1 = BinaryF1Score()
+
     def forward(self, x):
         x = self.backbone(x)
         x = self.head(x)
         return x
 
     def on_fit_start(self) -> None:
-        freeze_stages(self.backbone, frozen_stages=3)
         adaptive_batch_norm(self.backbone, self.val_transforms,
                             self.train_data_loader, self.device)
+        freeze_stages(self.backbone, frozen_stages=self.frozen_stages)
 
     def training_step(self, batch, batch_idx):
         img, label = batch
@@ -103,8 +121,17 @@ class EfficientNetSpoofingDetection(L.LightningModule):
             img = self.val_transforms(img)
         output = self.forward(img)
         loss = self.criterion(output, label)
+
+        # Track accuracy with 0.05 threshold to monitor actual performance
+        preds = (torch.sigmoid(output) > 0.05).int()
+        self.val_acc.update(preds, label.int())
+        self.val_f1.update(preds, label.int())
+
         self.log('val_loss', loss, on_epoch=True,
                  prog_bar=True, sync_dist=True)
+        self.log('val_acc', self.val_acc, on_epoch=True,
+                 prog_bar=True, sync_dist=True)
+        self.log('val_f1', self.val_f1, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW([
@@ -117,7 +144,7 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
-            'monitor': 'val_loss'  # This must exactly match your self.log() name
+            'monitor': 'val_loss'
         }
 
     def test_step(self, batch, batch_idx):
@@ -228,17 +255,36 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         self._test_total_samples = 0
 
 
-def get_model(with_weights: bool = False, device: torch.device = torch.device('cpu')) -> nn.Module:
-    """Getting the EfficientNet v2 small model for either training or inference"""
+def get_model(model_name: str,
+              with_weights: bool = False,
+              device: torch.device = torch.device('cpu')) -> nn.Module:
 
-    if with_weights:
-        model = models.efficientnet_v2_s(
-            weights=models.EfficientNet_V2_S_Weights.DEFAULT,
+    model = None
+
+    if model_name == 'efficientnet_v2_s':
+        # 1. Load Torchvision model
+        weights = models.EfficientNet_V2_S_Weights.DEFAULT if with_weights else None
+        model = models.efficientnet_v2_s(weights=weights)
+
+        # 2. Extract input features BEFORE replacing the head
+        # EfficientNet classifier is Sequential: [0]=Dropout, [1]=Linear
+        n_features = model.classifier[1].in_features
+
+        # 3. Standardize: Remove head and attach num_features
+        cast(nn.Module, model).classifier = nn.Identity()
+        model.num_features = n_features
+
+    elif model_name == 'mobile_net_v4':
+        # 1. Load Timm model
+        # num_classes=0 automatically removes the head and pools the features
+        model = timm.create_model(
+            'mobilenetv4_conv_medium.e500_r224_in1k',  # Use r224 for 224x224 input
+            pretrained=with_weights,
+            num_classes=0
         )
-    else:
-        model = models.efficientnet_v2_s(weights=None)
+        # Timm models already have a .num_features attribute, so no extra work needed
 
-    in_features = cast(nn.Linear, model.classifier[1]).in_features
-    model.classifier[1] = nn.Linear(in_features, 2)
+    else:
+        raise ValueError(f"Unsupported model_name: {model_name}")
 
     return model.to(device)
