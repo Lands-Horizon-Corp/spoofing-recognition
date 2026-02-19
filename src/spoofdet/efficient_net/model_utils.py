@@ -87,7 +87,6 @@ def adaptive_batch_norm(model, val_transforms, data_loader, device, num_batches=
             if i >= num_batches:
                 break
             imgs = imgs.to(device)
-            imgs = val_transforms(imgs)
             model(imgs)
     print('Adaptive BatchNorm completed')
 

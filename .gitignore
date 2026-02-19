@@ -13,3 +13,4 @@ fine_tune_results/
 tb_logs
 logs
 *.pt
+*.ckpt

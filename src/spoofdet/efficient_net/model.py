@@ -47,8 +47,7 @@ class EfficientNetSpoofingDetection(L.LightningModule):
                     'test_precision_perclass',
                     'test_recall_perclass',
                     'test_f1_perclass',
-                    'test_confmat',
-                    'frozen_stages'])
+                    'test_confmat'])
         self.backbone_model: Literal['efficientnet_v2_s',
                                      'mobile_net_v4'] = backbone_model
         self.train_data_loader = train_data_loader
@@ -93,6 +92,8 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         # Validation metrics to monitor performance with 0.05 threshold
         self.val_acc = BinaryAccuracy()
         self.val_f1 = BinaryF1Score()
+        self.val_precision = BinaryPrecision()
+        self.val_recall = BinaryRecall()
 
     def forward(self, x):
         x = self.backbone(x)
@@ -104,34 +105,41 @@ class EfficientNetSpoofingDetection(L.LightningModule):
                             self.train_data_loader, self.device)
         freeze_stages(self.backbone, frozen_stages=self.frozen_stages)
 
-    def training_step(self, batch, batch_idx):
+    def _step(self, batch):
         img, label = batch
+        original_label = label.clone()  # Keep original labels for metrics
         label = label.view(-1, 1).float()
-        if self.train_transforms is not None:
-            img = self.train_transforms(img)
-        output = self.forward(img)
-        loss = self.criterion(output, label)
+        smoothing_value = 0.08
+        label = label * (1.0 - smoothing_value) + 0.5 * smoothing_value
+        logits = self.forward(img)
+        loss = self.criterion(logits, label)
+        return loss, logits, original_label
+
+    def training_step(self, batch, batch_idx):
+        loss, logits, label = self._step(batch)
         self.log('train_loss', loss,  prog_bar=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        img, label = batch
-        label = label.view(-1, 1).float()
-        if self.val_transforms is not None:
-            img = self.val_transforms(img)
-        output = self.forward(img)
-        loss = self.criterion(output, label)
+        loss, logits, label = self._step(batch)
 
         # Track accuracy with 0.05 threshold to monitor actual performance
-        preds = (torch.sigmoid(output) > 0.05).int()
+        preds = (torch.sigmoid(logits) > 0.2).int().squeeze(1)
         self.val_acc.update(preds, label.int())
+        self.val_precision.update(preds, label.int())
+        self.val_recall.update(preds, label.int())
         self.val_f1.update(preds, label.int())
 
         self.log('val_loss', loss, on_epoch=True,
                  prog_bar=True, sync_dist=True)
         self.log('val_acc', self.val_acc, on_epoch=True,
                  prog_bar=True, sync_dist=True)
-        self.log('val_f1', self.val_f1, on_epoch=True, sync_dist=True)
+        self.log('val_precision', self.val_precision, on_epoch=True,
+                 prog_bar=True, sync_dist=True)
+        self.log('val_recall', self.val_recall, on_epoch=True,
+                 prog_bar=True, sync_dist=True)
+        self.log('val_f1', self.val_f1, on_epoch=True,
+                 prog_bar=True, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW([
@@ -148,16 +156,9 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         }
 
     def test_step(self, batch, batch_idx):
-        images, labels = batch
-        labels = labels.view(-1, 1).float()   # [B, 1]
-        if self.val_transforms is not None:
-            images = self.val_transforms(images)  # [B, C, H, W]
-        logits = self(images)                 # [B, 1]
-        loss = self.criterion(logits, labels)
-
-        # Convert logits → binary predictions (0 or 1)
+        loss, logits, labels = self._step(batch)
         # liveniness should be 95% confident
-        preds = (torch.sigmoid(logits) > 0.05).int()
+        preds = (torch.sigmoid(logits) > 0.2).int().squeeze(1)
 
         # ----- UPDATE ALL METRICS -----
         self.test_acc.update(preds, labels.int())
