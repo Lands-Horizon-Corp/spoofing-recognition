@@ -6,15 +6,114 @@ from typing import Any
 from typing import cast
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import auc
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import f1_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import roc_curve
 from spoofdet.data_processing import get_data_for_training
 from spoofdet.dataset import CelebASpoofDataset
 from torch.utils.data import Subset
 from torchvision import models
 from torchvision.transforms import v2
+
+
+def test_model(model, test_loader, device, threshold):
+
+    # Evaluate quantized model on test set
+
+    test_predictions = []
+    test_labels = []
+    with torch.no_grad():
+        for i, (img, label) in enumerate(test_loader):
+            img = img.to(device)
+
+            outputs = model(img)
+            predictions = torch.sigmoid(outputs).squeeze()
+            predictions = (predictions > threshold).long()
+
+            test_predictions.extend(predictions.cpu().numpy())
+            test_labels.extend(label.numpy())
+
+    # Calculate metrics
+
+    accuracy = accuracy_score(test_labels, test_predictions)
+    precision = precision_score(test_labels, test_predictions, zero_division=0)
+    recall = recall_score(test_labels, test_predictions, zero_division=0)
+    f1 = f1_score(test_labels, test_predictions, zero_division=0)
+    confusion_mat = confusion_matrix(test_labels, test_predictions)
+
+    print('Quantized Model Test Results:')
+    print(f"Accuracy:  {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall:    {recall:.4f}")
+    print(f"F1 Score:  {f1:.4f}")
+    print(f"\nConfusion Matrix:\n{confusion_mat}")
+
+    # create a plot of cm
+    plt.figure(figsize=(6, 5))
+    plt.imshow(confusion_mat, interpolation='nearest', cmap='Blues')
+    plt.title('Confusion Matrix - Quantized Model')
+    plt.colorbar()
+    tick_marks = np.arange(2)
+    plt.xticks(tick_marks, ['Live', 'Spoof'], rotation=45)
+    plt.yticks(tick_marks, ['Live', 'Spoof'])
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.tight_layout()
+    plt.show()
+
+
+# Get predictions and labels on full test set
+def calculate_roc_auc(model_quantized, small_test_loader):
+    all_predictions = []
+    all_labels = []
+
+    with torch.no_grad():
+        for img, label in small_test_loader:
+            img = img.to(torch.device)
+
+            outputs = model_quantized(img)
+            predictions = torch.sigmoid(outputs).squeeze().cpu().numpy()
+
+            all_predictions.extend(predictions)
+            all_labels.extend(label.numpy())
+
+    # Calculate ROC curve and AUC
+    fpr, tpr, thresholds = roc_curve(all_labels, all_predictions)
+    roc_auc = auc(fpr, tpr)
+
+    print(f"AUC-ROC Score: {roc_auc:.4f}")
+
+    # Find optimal threshold (Youden's J statistic)
+    optimal_idx = np.argmax(tpr - fpr)
+    optimal_threshold = thresholds[optimal_idx]
+
+    print(f"Optimal Threshold: {optimal_threshold:.4f}")
+
+    # Plot ROC curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, color='darkorange', lw=2,
+             label=f'ROC curve (AUC = {roc_auc:.4f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2,
+             linestyle='--', label='Random Classifier')
+    plt.scatter(fpr[optimal_idx], tpr[optimal_idx], marker='o', color='red',
+                s=100, label=f'Optimal Threshold = {optimal_threshold:.4f}')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve - Quantized Model')
+    plt.legend(loc='lower right')
+    plt.grid(alpha=0.3)
+    plt.show()
 
 
 def freeze_stages(model: nn.Module, frozen_stages: int):
@@ -172,12 +271,14 @@ def analyze_spoof_types(
                 actual_idx = dataset.indices[idx]
                 parent_dataset = cast(CelebASpoofDataset, dataset.dataset)
                 image_key = parent_dataset.image_keys[actual_idx]
-                full_labels = parent_dataset.label_dict[image_key]
+                full_labels = cast(CelebASpoofDataset,
+                                   parent_dataset).samples[image_key]
             else:
                 # Direct dataset access
                 celeba_dataset = cast(CelebASpoofDataset, dataset)
                 image_key = celeba_dataset.image_keys[idx]
-                full_labels = celeba_dataset.label_dict[image_key]
+                full_labels = cast(CelebASpoofDataset,
+                                   parent_dataset).samples[image_key]
 
             # Get the original key to access full label info
 
@@ -343,7 +444,8 @@ def analyze_dataset_spoof_distribution(
     for idx in indices:
 
         image_key = parent_dataset.image_keys[idx]
-        full_labels = parent_dataset.label_dict[image_key]
+        full_labels = cast(CelebASpoofDataset,
+                           parent_dataset).samples[image_key]
 
         live_spoof_label = full_labels[43]  # Live/Spoof at index 43
 
