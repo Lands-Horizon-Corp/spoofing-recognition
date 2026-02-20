@@ -1,6 +1,4 @@
 fastapi[standard]==0.128.1
-lightning==2.6.1
-matplotlib==3.10.8
 numpy==2.4.2
 pandas==3.0.0
 Pillow==12.1.0
