@@ -1,78 +1,61 @@
 from __future__ import annotations
 
 import numpy as np
-import torch
-from app.core.config import ModelConfig
+import onnxruntime
+import onnxruntime as ort
+from app.core.config import model_config
 from app.core.config import settings
 from spoofdet.verify_memory import print_memory_usage
+
+
+def calculate_sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
 
 class SpoofDetector:
     _instance = None
     _initialized = False
-    device: torch.device  # Add type annotation for device
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.device = torch.device(
-                'cuda' if torch.cuda.is_available() else 'cpu',
-            )
         return cls._instance
 
     def __init__(self):
         if self._initialized:
             return
-        self.model = None
         self.version = '1.0'
-        self.config = ModelConfig()
+        self.config = model_config
         self._initialized = True
         print_memory_usage('SpoofDetector Initialized')
 
-    def _load_model(self):
-        if self.model is None:
-            model = torch.jit.load(
-                settings.MODEL_PATH, map_location=self.device)
-            model.to(device=self.device)
-            model = torch.compile(model, backend='inductor')
-            model.eval()
-            self.model = model
-            print_memory_usage('[model] Model Loaded')
-            return self.model
+    def load_model(self) -> onnxruntime.InferenceSession:
+        ort_session = ort.InferenceSession(settings.MODEL_PATH)
+        print_memory_usage('Model Loaded into SpoofDetector')
+        return ort_session
 
-    def predict(self, image: np.ndarray) -> tuple:
-        self._load_model()
-        processed = self.preprocess(image)
-        with torch.no_grad():
-            assert self.model is not None, 'Model must be loaded before prediction'
-            outputs = self.model(processed)
-            probs = torch.sigmoid(outputs)
-            prediction = (probs > self.config.THRESHOLD).long()
-            spoof_confidence = probs
-        return prediction, spoof_confidence
-
-    def preprocess(self, input_image: np.ndarray) -> torch.Tensor:
+    def preprocess(self, input_image: np.ndarray) -> np.ndarray:
         assert input_image.dtype == np.uint8, 'Image dtype must be uint8'
-        # _, gpu_transform_val = get_transform_pipeline(
-        #     device=self.device,
-        #     target_size=self.config.TARGET_SIZE,
-        # )
-        # if isinstance(input_image, np.ndarray):
-        # Convert NumPy (H, W, C) -> Tensor (C, H, W)
-        # image_tensor: torch.Tensor = torch.from_numpy(
-        #     input_image,
-        # ).permute(2, 0, 1)
-        processed_image = torch.from_numpy(
-            self._preprocess_img(input_image)
-                .astype(np.float32)
-        )
 
+        processed_image = self._preprocess_img(input_image)
+        processed_image = processed_image.astype(np.float32)
         assert (
             processed_image.ndim == 4
         ), 'image must have 4 dimensions: \n'
         f"{processed_image.shape} \n"
         f"{processed_image.ndim}"
         return processed_image
+
+    def predict(self, image: np.ndarray, session: onnxruntime.InferenceSession) -> tuple:
+        processed = self.preprocess(image)
+        model_input_name = session.get_inputs()[0].name
+        ort_inputs = {model_input_name: processed}
+        outputs = session.run(None, ort_inputs)
+        spoof_confidence = np.array(outputs[0]).item()
+        spoof_confidence = calculate_sigmoid(spoof_confidence)
+        prediction = (spoof_confidence >
+                      self.config.THRESHOLD).astype(np.int32)
+        return prediction, spoof_confidence
 
     def _preprocess_img(self, img_np: np.ndarray) -> np.ndarray:
 
@@ -94,6 +77,8 @@ class SpoofDetector:
 
         return img_np
 
+
+spoof_detector = SpoofDetector()
 
 if __name__ == '__main__':
     detector = SpoofDetector()

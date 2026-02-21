@@ -50,7 +50,8 @@ class Settings(BaseSettings):
     APP_ENV: str = 'production'
     CORS_ALLOW_ORIGINS: list[str] = []
 
-    MODEL_PATH: str = str(BASE_DIR / 'spoofing_detection_api/models/model.pt')
+    MODEL_PATH: str = str(
+        BASE_DIR / 'spoofing_detection_api/models/model.onnx')
 
     PARAMS_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/params.json')
@@ -58,6 +59,7 @@ class Settings(BaseSettings):
     SPOOFING_MODEL_DOWNLOADS_URL_ENV: str = ''
     SPOOFING_PARAMS_DOWNLOAD_URL_ENV: str = ''
     THRESHOLD: float = 0.5
+    OPENAPI_PATH: str = str(BASE_DIR / 'spoofing_detection_api/openapi.json')
 
     @model_validator(mode='after')
     def set_cors_origins(self):

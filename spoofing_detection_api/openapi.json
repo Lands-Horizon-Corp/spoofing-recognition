@@ -1,0 +1,174 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Spoofing Detection API",
+    "description": "Edge API for detecting presentation attacks (spoofing) in uploaded images.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8001",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root endpoint",
+        "description": "Returns a welcome message to verify the API is running.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Welcome to the Spoofing Detection API!"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "description": "Returns the health status of the API.",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/spoof/detect": {
+      "post": {
+        "summary": "Detect spoofing in an image",
+        "description": "Upload an image file to determine if it is a live capture or a spoofing attempt.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to analyze (JPEG, PNG, etc.)"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detection successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "is_spoof": {
+                      "type": "boolean",
+                      "description": "True if the image is classified as a spoof"
+                    },
+                    "spoof_confidence": {
+                      "type": "number",
+                      "format": "float",
+                      "description": "Confidence score for the spoof classification"
+                    }
+                  },
+                  "required": ["is_spoof", "spoof_confidence"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (e.g., no file, not an image, processing error)",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "File must be an image"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/spoof/detect/verbose": {
+      "post": {
+        "summary": "Verbose spoof detection",
+        "description": "Upload an image; returns 204 if live, 401 if spoof detected.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to analyze"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Live image detected – no content"
+          },
+          "400": {
+            "description": "Invalid request (no file, not an image, processing error)",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "File must be an image"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Spoof detected",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "Spoof detected"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
