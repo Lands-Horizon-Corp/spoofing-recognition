@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-import onnxruntime
 import onnxruntime as ort
 from app.core.config import model_config
 from app.core.config import settings
@@ -29,7 +28,7 @@ class SpoofDetector:
         self._initialized = True
         print_memory_usage('SpoofDetector Initialized')
 
-    def load_model(self) -> onnxruntime.InferenceSession:
+    def load_model(self) -> ort.InferenceSession:
         ort_session = ort.InferenceSession(settings.MODEL_PATH)
         print_memory_usage('Model Loaded into SpoofDetector')
         return ort_session
@@ -46,7 +45,7 @@ class SpoofDetector:
         f"{processed_image.ndim}"
         return processed_image
 
-    def predict(self, image: np.ndarray, session: onnxruntime.InferenceSession) -> tuple:
+    def predict(self, image: np.ndarray, session: ort.InferenceSession) -> tuple:
         processed = self.preprocess(image)
         model_input_name = session.get_inputs()[0].name
         ort_inputs = {model_input_name: processed}
@@ -58,7 +57,6 @@ class SpoofDetector:
         return prediction, spoof_confidence
 
     def _preprocess_img(self, img_np: np.ndarray) -> np.ndarray:
-
         img_np = img_np.astype(np.float32) / 255.0
         # 1. Load Image
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)

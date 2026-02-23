@@ -55,6 +55,8 @@ class Settings(BaseSettings):
 
     PARAMS_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/params.json')
+    FACE_DETECTOR_MODEL_PATH: str = str(
+        BASE_DIR / 'spoofing_detection_api/models/version-RFB-320_without_postprocessing.onnx')
     API_V1_PREFIX: str = '/api/v1'
     SPOOFING_MODEL_DOWNLOADS_URL_ENV: str = ''
     SPOOFING_PARAMS_DOWNLOAD_URL_ENV: str = ''

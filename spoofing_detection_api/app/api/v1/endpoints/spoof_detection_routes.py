@@ -5,6 +5,7 @@ from app.services.detection_service import predict_spoof
 from robyn import Request
 from robyn import Response
 from robyn import SubRouter
+from spoofdet.verify_memory import print_memory_usage
 
 router = SubRouter(__file__, prefix='/api/v1/spoof')
 print('Spoof Detection Routes Loaded')
@@ -33,6 +34,7 @@ async def detect_spoof(request: Request):
     # Debug: Print available files)
 
     if not is_image_file(img):
+        print_memory_usage('Error during prediction')
         return Response(
             status_code=400,
             headers={'Content-Type': 'application/json'},
@@ -42,12 +44,13 @@ async def detect_spoof(request: Request):
     try:
         result = await predict_spoof(img)
     except ValueError as e:
+        print_memory_usage('Error during prediction')
         return Response(
             status_code=400,
             headers={'Content-Type': 'application/json'},
             description=f'{{"error": "{str(e)}"}}'
         )
-
+    print_memory_usage('Prediction completed')
     return result
 
 
