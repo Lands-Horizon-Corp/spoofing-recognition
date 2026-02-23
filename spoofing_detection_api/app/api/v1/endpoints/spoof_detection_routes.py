@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import filetype
 from app.services.detection_service import predict_spoof
 from robyn import Request
@@ -67,11 +69,12 @@ async def detect_spoof_verbose(request: Request):
 
     if not file:
         available_keys = list(request.files.keys()) if request.files else []
+        error = 'No file uploaded'
+        descriptions = json.dumps({'error': error, 'details': available_keys})
         return Response(
             status_code=400,
             headers={'Content-Type': 'application/json'},
-            description=f'{{"error": "No file uploaded", "available_keys": {
-                available_keys}}}'
+            description=descriptions
         )
 
     if not is_image_file(file):
