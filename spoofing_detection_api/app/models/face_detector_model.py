@@ -74,8 +74,9 @@ class FaceDetectorModel:
 
         priors = np.array(priors, dtype=np.float32)
         # Sanity check: should be 4420
-        assert priors.shape[0] == 4420, f"Expected 4420 priors, got {
-            priors.shape[0]}"
+        assertExpect = f"Expected 4420 priors, got {priors.shape[0]}"
+        assert priors.shape[0] == 4420, assertExpect
+
         return priors
 
     def _decode_boxes(self, deltas, priors):

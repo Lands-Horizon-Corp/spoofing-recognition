@@ -29,8 +29,8 @@ class FrontalFaceDetectorModel:
 
     def _preprocess(self, image):
         image_matrix = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        print(f"face image size: {image.size}, matrix shape: {
-              image_matrix.shape}")
+        print(f"face image size: {image.size}, "
+              f"matrix shape: {image_matrix.shape}")
         image_matrix = cv2.cvtColor(image_matrix, cv2.COLOR_BGR2GRAY)
         image_matrix = cv2.resize(
             image_matrix, (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
