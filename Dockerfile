@@ -31,4 +31,4 @@ ENV PYTHONPATH="${PYTHONPATH}:/code/src:/code/spoofing_detection_api"
 
 # 6. Run the App
 # We point to the nested main.py file
-CMD ["python", "spoofing_detection_api/app/main.py", "--fast"]
+CMD ["python", "spoofing_detection_api/app/main.py", "--fast", "--workers", "1", "--processes", "1"]
