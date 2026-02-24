@@ -51,9 +51,8 @@ async def predict_spoof(upload_file: bytes) -> dict:
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
     face_image = np.array(face_image)
-    session = spoof_detector.load_model()
     prediction, spoof_confidence = await asyncio.to_thread(
-        spoof_detector.predict, face_image, session)
+        spoof_detector.predict, face_image)
 
     return {
         'is_spoof': bool(prediction),

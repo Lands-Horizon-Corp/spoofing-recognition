@@ -8,16 +8,19 @@ from PIL import Image
 
 
 class FaceDetectorModel:
-    def __init__(self, model_path, confidence_cutoff=0.7):
+    def __init__(self, confidence_cutoff=0.7):
         self.threshold = confidence_cutoff
-        self.model = self._load_model(model_path)
+        self.model = None
         self.target_size = (320, 240)          # (width, height)
         self.priors = self._generate_priors()  # correct shape (4420, 4)
 
     def _load_model(self, model_path):
+        if self.model is not None:
+            return self.model
         options = ort.SessionOptions()
         options.log_severity_level = 3
-        return ort.InferenceSession(model_path, sess_options=options)
+        self.model = ort.InferenceSession(
+            settings.FACE_DETECTOR_MODEL_PATH, sess_options=options)
 
     def _generate_priors(self):
         """
@@ -131,8 +134,11 @@ class FaceDetectorModel:
         return face_scores, raw_deltas
 
     def find_faces(self, image: Image.Image) -> list:
+        if self.model is None:
+            self._load_model(settings.FACE_DETECTOR_MODEL_PATH)
         orig_w, orig_h = image.size
         input_tensor = self._preprocess(image)
+        assert self.model is not None
         scores, deltas = self._detect_faces(self.model, input_tensor)
 
         # Decode deltas using anchors to get normalized [x1,y1,x2,y2]
@@ -189,4 +195,4 @@ class FaceDetectorModel:
 
 
 # Singleton instance
-face_detector = FaceDetectorModel(model_path=settings.FACE_DETECTOR_MODEL_PATH)
+face_detector = FaceDetectorModel()

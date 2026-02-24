@@ -15,6 +15,8 @@ async def download_model():
 
         os.makedirs(os.path.dirname(settings.MODEL_PATH), exist_ok=True)
         os.makedirs(os.path.dirname(settings.PARAMS_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(
+            settings.FACE_DETECTOR_MODEL_PATH), exist_ok=True)
 
         await utils.download_file(
             file_url=settings.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
@@ -24,6 +26,11 @@ async def download_model():
         await utils.download_file(
             file_url=settings.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
             file_path=settings.PARAMS_PATH,
+        )
+
+        await utils.download_file(
+            file_url=settings.SPOOFING_FACE_DETECTOR_DOWNLOAD_URL_ENV,
+            file_path=settings.FACE_DETECTOR_MODEL_PATH,
         )
 
 

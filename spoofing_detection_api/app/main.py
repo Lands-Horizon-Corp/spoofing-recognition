@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.api.base_routes import base_route
 from app.core import startup
+from app.core.config import model_config
 from app.core.config import settings
 from app.core.security import limiter
 from robyn import ALLOW_CORS
@@ -21,10 +22,11 @@ ALLOW_CORS(app, origins=settings.CORS_ALLOW_ORIGINS)
 
 @app.startup_handler
 async def run_on_startup():
+    await startup.download_model()
     print_memory_usage('Startup Complete')
     print('Starting up the API...')
-    await startup.download_model()
     print_memory_usage('Startup Tasks Completed')
+    model_config.load_model_params()
 
 
 @app.before_request()

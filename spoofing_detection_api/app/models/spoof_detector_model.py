@@ -26,12 +26,15 @@ class SpoofDetector:
         self.version = '1.0'
         self.config = model_config
         self._initialized = True
+        self.model = None
         print_memory_usage('SpoofDetector Initialized')
 
-    def load_model(self) -> ort.InferenceSession:
+    def load_model(self):
+        if self.model is not None:
+            return self.model
         ort_session = ort.InferenceSession(settings.MODEL_PATH)
+        self.model = ort_session
         print_memory_usage('Model Loaded into SpoofDetector')
-        return ort_session
 
     def preprocess(self, input_image: np.ndarray) -> np.ndarray:
         assert input_image.dtype == np.uint8, 'Image dtype must be uint8'
@@ -45,7 +48,9 @@ class SpoofDetector:
         f"{processed_image.ndim}"
         return processed_image
 
-    def predict(self, image: np.ndarray, session: ort.InferenceSession) -> tuple:
+    def predict(self, image: np.ndarray) -> tuple:
+        session = self.load_model()
+        assert session is not None, 'Model session is not loaded'
         processed = self.preprocess(image)
         model_input_name = session.get_inputs()[0].name
         ort_inputs = {model_input_name: processed}
