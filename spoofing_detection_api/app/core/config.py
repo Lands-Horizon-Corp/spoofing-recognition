@@ -31,6 +31,8 @@ allowed_origins_production = [
     'https://e-coop-client-development.up.railway.app',
     'https://e-coop-client-production.up.railway.app',
     'https://e-coop-client-staging.up.railway.app',
+
+    'https://spoofing-recognition-development.up.railway.app',
 ]
 
 allowed_origins_development = [
@@ -43,8 +45,6 @@ allowed_origins_development = [
     'http://localhost:4173',
     'http://localhost:4174',
     # /default/post_api_v1_spoof_detect
-    'https://spoofing-recognition-development.up.railway.app/docs',
-    'http://localhost:8001/api/v1/spoof/detect'
 ]
 
 
