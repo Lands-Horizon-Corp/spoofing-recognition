@@ -58,3 +58,7 @@ all of the code use for training is on the notebook directory.
 dataset source
 
 https://github.com/ZhangYuanhan-AI/CelebA-Spoof
+
+
+
+# Future Plans
