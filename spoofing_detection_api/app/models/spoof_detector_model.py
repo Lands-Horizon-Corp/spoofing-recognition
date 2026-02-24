@@ -49,12 +49,12 @@ class SpoofDetector:
         return processed_image
 
     def predict(self, image: np.ndarray) -> tuple:
-        session = self.load_model()
-        assert session is not None, 'Model session is not loaded'
+        self.load_model()
+        assert self.model is not None, 'Model session is not loaded'
         processed = self.preprocess(image)
-        model_input_name = session.get_inputs()[0].name
+        model_input_name = self.model.get_inputs()[0].name
         ort_inputs = {model_input_name: processed}
-        outputs = session.run(None, ort_inputs)
+        outputs = self.model.run(None, ort_inputs)
         spoof_confidence = np.array(outputs[0]).item()
         spoof_confidence = calculate_sigmoid(spoof_confidence)
         prediction = (spoof_confidence >
