@@ -52,9 +52,6 @@ uvicorn app.main:app --app-dir spoofing_detection_api --host 0.0.0.0 --port 8002
 
 
 
-
-
-
 # Training
 all of the code use for training is on the notebook directory.
 

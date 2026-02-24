@@ -50,12 +50,19 @@ class Settings(BaseSettings):
     APP_ENV: str = 'production'
     CORS_ALLOW_ORIGINS: list[str] = []
 
-    MODEL_PATH: str = str(BASE_DIR / 'spoofing_detection_api/models/model.pt')
+    MODEL_PATH: str = str(
+        BASE_DIR / 'spoofing_detection_api/models/model.onnx')
+
     PARAMS_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/params.json')
+    FACE_DETECTOR_MODEL_PATH: str = str(
+        BASE_DIR / 'spoofing_detection_api/models/version-RFB-320_without_postprocessing.onnx')
     API_V1_PREFIX: str = '/api/v1'
     SPOOFING_MODEL_DOWNLOADS_URL_ENV: str = ''
     SPOOFING_PARAMS_DOWNLOAD_URL_ENV: str = ''
+    SPOOFING_FACE_DETECTOR_DOWNLOAD_URL_ENV: str = ''
+    THRESHOLD: float = 0.5
+    OPENAPI_PATH: str = str(BASE_DIR / 'spoofing_detection_api/openapi.json')
 
     @model_validator(mode='after')
     def set_cors_origins(self):
@@ -84,7 +91,6 @@ class ModelConfig(BaseSettings):
     THRESHOLD: float = 0.5
     TARGET_SIZE: int = 320
 
-    @model_validator(mode='after')
     def load_model_params(self, path: str = settings.PARAMS_PATH):
         try:
             with open(path) as f:
@@ -102,3 +108,6 @@ class ModelConfig(BaseSettings):
             print(f'Error loading model parameters: {e}')
         # NOTE: add feature for deleting old files
         return self
+
+
+model_config = ModelConfig()

@@ -12,3 +12,13 @@ services:
       - ./spoofing_detection_api/:/code/spoofing_detection_api
       - ./src:/code/src
       - ./.env:/code/.env
+    command:
+      [
+        "python3",
+        "-m",
+        "robyn",
+        "spoofing_detection_api/app/main.py",
+        "--dev",
+        "--log-level",
+        "DEBUG",
+      ]

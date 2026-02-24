@@ -11,7 +11,7 @@ COPY ./pyproject.toml /code/pyproject.toml
 
 # 3. Install dependencies
 # seaparete installation of torch to avoid issues with cache and large files
-RUN pip install --no-cache-dir torch torchvision torchmetrics --index-url https://download.pytorch.org/whl/cpu
+# RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 # NOTE make sure to that requirements.txt does not include torch or fastapi to avoid conflicts
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
@@ -31,4 +31,4 @@ ENV PYTHONPATH="${PYTHONPATH}:/code/src:/code/spoofing_detection_api"
 
 # 6. Run the App
 # We point to the nested main.py file
-CMD ["fastapi", "run", "spoofing_detection_api/app/main.py", "--port", "80"]
+CMD ["python", "spoofing_detection_api/app/main.py", "--fast"]

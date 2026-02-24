@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from robyn_rate_limits import InMemoryStore
+from robyn_rate_limits import RateLimiter
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = RateLimiter(store=InMemoryStore, calls_limit=20, limit_ttl=30)

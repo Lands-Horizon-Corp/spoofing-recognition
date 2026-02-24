@@ -1,88 +1,41 @@
 from __future__ import annotations
 
-import os
-from typing import Union
-
-from app.api.v1.routers import api_router
-from app.core import utils
+from app.api.base_routes import base_route
+from app.core import startup
+from app.core.config import model_config
 from app.core.config import settings
 from app.core.security import limiter
-from fastapi import FastAPI
-from fastapi.concurrency import asynccontextmanager
-from fastapi.middleware.cors import CORSMiddleware
+from robyn import ALLOW_CORS
+from robyn import Request
+from robyn import Robyn
+from spoofdet.verify_memory import print_memory_usage
 
-# SPOOFING_MODEL_DOWNLOADS_URL_ENV = os.getenv(
-#     'SPOOFING_MODEL_DOWNLOADS_URL_ENV')
-# SPOOFING_PARAMS_DOWNLOAD_URL_ENV = os.getenv(
-#     'SPOOFING_PARAMS_DOWNLOAD_URL_ENV')
+print_memory_usage('Starting up the API...')
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Perform any startup tasks here (e.g., load model, initialize resources)
-    print('Starting up the API...')
-
-    if os.path.isfile(settings.PARAMS_PATH) and os.path.isfile(settings.MODEL_PATH):
-        print('Model and params file found locally, loading params.')
-    else:
-        print('Params file not found at, downloading needed files.')
-
-        os.makedirs(os.path.dirname(settings.MODEL_PATH), exist_ok=True)
-        os.makedirs(os.path.dirname(settings.PARAMS_PATH), exist_ok=True)
-
-        await utils.download_file(
-            file_url=settings.SPOOFING_MODEL_DOWNLOADS_URL_ENV,
-            file_path=settings.MODEL_PATH,
-        )
-
-        await utils.download_file(
-            file_url=settings.SPOOFING_PARAMS_DOWNLOAD_URL_ENV,
-            file_path=settings.PARAMS_PATH,
-        )
-    yield
-    # Perform any shutdown tasks here (e.g., release resources)
-    print('Shutting down the API...')
-
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    lifespan=lifespan,
-    # 1. Hide Swagger UI (/docs)
-    docs_url='/docs' if settings.APP_ENV == 'development'
-    or settings.APP_ENV == 'staging' else None,
-    # 2. Hide ReDoc (/redoc)
-    redoc_url='/redoc' if settings.APP_ENV == 'development'
-    or settings.APP_ENV == 'staging' else None,
-    # 3. (Optional) Hide the openapi.json schema file itself
-    openapi_url='/openapi.json' if settings.APP_ENV == 'development'
-    or settings.APP_ENV == 'staging' else None,
-)
+app = Robyn(__file__, openapi_file_path=settings.OPENAPI_PATH)
 
 
 origin = settings.CORS_ALLOW_ORIGINS
-
-app.state.limiter = limiter
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origin,
-    allow_credentials=True,
-    allow_methods=['GET', 'POST'],
-    allow_headers=['*'],
-)
+ALLOW_CORS(app, origins=settings.CORS_ALLOW_ORIGINS)
 
 
-app.include_router(api_router, prefix='/api/v1')
+@app.startup_handler
+async def run_on_startup():
+    await startup.download_model()
+    print_memory_usage('Startup Complete')
+    print('Starting up the API...')
+    print_memory_usage('Startup Tasks Completed')
+    model_config.load_model_params()
 
 
-@app.get('/health', response_model=Union[dict, str])
-async def health_check():
-    """Health check endpoint to verify that the API is running."""
-    return {'status': 'ok'}
+@app.before_request()
+def intercept_and_limit(req: Request):
+    return limiter.handle_request(app, req)
 
 
-# def main():
-#     uvicorn.run(app, host='0.0.0.0', port=8000)
+app.include_router(base_route)
 
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    app.start(host='0.0.0.0', port=8001)

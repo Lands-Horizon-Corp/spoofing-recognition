@@ -17,7 +17,6 @@ from torchvision.transforms import v2
 
 
 def get_transform_pipeline(
-    device: torch.device,
     target_size: int,
 ) -> tuple[v2.Compose, v2.Compose]:
     """
@@ -26,7 +25,6 @@ def get_transform_pipeline(
 
     gpu_transforms_train = v2.Compose(
         [
-            v2.Resize((target_size, target_size), antialias=True),
             # v2.ToImage(),
             # v2.RandomResizedCrop(
             #     size=(target_size, target_size),
@@ -44,17 +42,17 @@ def get_transform_pipeline(
             # ),
             v2.ToDtype(torch.float32, scale=True),
             v2.ColorJitter(
-                brightness=0.05,
-                contrast=0.05,
-                saturation=0.02,
+                brightness=0.3,
+                contrast=0.3,
+                saturation=0.2,
                 hue=0,
             ),
-            # v2.RandomGrayscale(p=0.1),
+            v2.RandomGrayscale(p=0.1),
             # v2.Grayscale(num_output_channels=3),
             # v2.RandomGrayscale(p=0.1),
-            # v2.GaussianBlur(kernel_size=3, sigma=(0.3, 2.0)),
+            # v2.GaussianBlur(kernel_size=3, sigma=(0.2, 2.0)),
             # v2.GaussianNoise(sigma=0.02),
-            # v2.RandomErasing(p=0.2),
+            v2.RandomErasing(p=0.2),
             v2.Normalize(mean=mean, std=std),
             # v2.RandomChoice(
             #     [
@@ -63,16 +61,16 @@ def get_transform_pipeline(
             #     ]
             # ),
         ],
-    ).to(device)
+    )
 
     gpu_transforms_val = v2.Compose(
         [
-            v2.Resize((target_size, target_size), antialias=True),
+            # v2.Resize((target_size, target_size), antialias=True),
             # v2.ToImage(),
             v2.ToDtype(torch.float32, scale=True),
             v2.Normalize(mean=mean, std=std),
         ],
-    ).to(device)
+    )
     return gpu_transforms_train, gpu_transforms_val
 
 
@@ -88,40 +86,42 @@ def create_subset(
 
     if isinstance(dataset_or_subset, Subset):
         source_dataset = dataset_or_subset.dataset
-        valid_indices = (
-            dataset_or_subset.indices
-        )  # The specific indices allowed for this split
+        valid_indices = dataset_or_subset.indices
     else:
         source_dataset = dataset_or_subset
         valid_indices = range(len(cast(Sized, dataset_or_subset)))
-    num_spoof = int(total_size * spoof_percent)
-    num_live = total_size - num_spoof
+
+    # Get labels efficiently
+    if hasattr(source_dataset, 'targets'):
+        all_labels = cast(CelebASpoofDataset,
+                          source_dataset).targets   # list of ints
+    elif hasattr(source_dataset, 'samples'):
+        all_labels = [label for _, label in cast(
+            CelebASpoofDataset, source_dataset).samples]
+    else:
+        # Fallback – but warn user
+        print('Warning: No fast label access, falling back to slow __getitem__')
+        all_labels = []
+        for i in range(len(cast(Sized, source_dataset))):
+            _, label = source_dataset[i]   # still slow, but only once?
+            all_labels.append(label)
+
+    # Now build indices using the pre‑computed labels
     live_indices_relative = []
     spoof_indices_relative = []
-
-    print(' Scanning specific indices for class balance...')
-
     for relative_idx, real_idx in enumerate(valid_indices):
-        key = cast(CelebASpoofDataset, source_dataset).image_keys[real_idx]
-        # 0 = Live, 1 = Spoof (Index 43 in your schema)
-        label = int(
-            cast(
-                CelebASpoofDataset,
-                source_dataset,
-            ).label_dict[
-                key
-            ][43],
-        )
-
+        label = all_labels[real_idx]
         if label == 0:
             live_indices_relative.append(relative_idx)
-        elif label == 1:
+        else:
             spoof_indices_relative.append(relative_idx)
 
     print(
         f" Found in this split: {len(live_indices_relative)}"
         f" Live | {len(spoof_indices_relative)} Spoof",
     )
+    num_live = int(total_size * (1 - spoof_percent))
+    num_spoof = total_size - num_live
 
     # Check if we have enough data
     if len(live_indices_relative) < num_live or len(spoof_indices_relative) < num_spoof:
@@ -359,19 +359,19 @@ def print_stats(data_dict: dict, name: str):
     print(f"  Spoof: {spoof_count} ({spoof_count/total*100:.1f}%)")
 
 
-if __name__ == '__main__':
-    import spoofdet.config as config
+# if __name__ == '__main__':
+#     import spoofdet.config as config
 
-    train_dict, val_dict = get_data_for_training(
-        json_path=str(config.TRAIN_JSON),
-        train_count=1000,
-        val_count=200,
-        spoof_percent=0.5,
-    )
-    train_ds = CelebASpoofDataset(
-        root_dir=config.ROOT_DIR,
-        json_label_path=train_dict,
-        bbox_json_path=config.BBOX_LOOKUP,
-        target_size=320,
-        bbox_original_size=config.BBOX_ORGINAL_SIZE,
-    )
+#     train_dict, val_dict = get_data_for_training(
+#         json_path=str(config.TRAIN_JSON),
+#         train_count=1000,
+#         val_count=200,
+#         spoof_percent=0.5,
+#     # )
+#     # train_ds = CelebASpoofDataset(
+#     #     root_dir=config.ROOT_DIR,
+#     #     json_label_path=train_dict,
+#     #     bbox_json_path=config.BBOX_LOOKUP,
+#     #     target_size=320,
+#     #     bbox_original_size=config.BBOX_ORGINAL_SIZE,
+#     # )

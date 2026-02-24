@@ -10,3 +10,10 @@ model.pt
 params.json
 .env
 fine_tune_results/
+tb_logs
+logs
+*.pt
+*.ckpt
+*.onnx
+*.data
+*.pth
