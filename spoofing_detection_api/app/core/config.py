@@ -43,7 +43,8 @@ allowed_origins_development = [
     'http://localhost:4173',
     'http://localhost:4174',
     # /default/post_api_v1_spoof_detect
-    'https://spoofing-recognition-development.up.railway.app/docs'
+    'https://spoofing-recognition-development.up.railway.app/docs',
+    'http://localhost:8001/api/v1/spoof/detect'
 ]
 
 
