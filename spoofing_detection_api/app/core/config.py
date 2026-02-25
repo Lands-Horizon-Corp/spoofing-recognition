@@ -9,6 +9,18 @@ from pydantic_settings import BaseSettings
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 
+allowed_headers = [
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Location',
+    'X-Organization-Id',
+    'X-User-Agent',
+    'X-Device-Type',
+    'X-CSRF-Token',
+]
+
+
 allowed_origins_production = [
     'https://ecoop-suite.netlify.app',
     'https://ecoop-suite.com',
@@ -52,7 +64,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = 'Spoof Detection API'
     APP_ENV: str = 'production'
     CORS_ALLOW_ORIGINS: list[str] = []
-
+    CORS_ALLOW_HEADERS: list[str] = allowed_headers
     MODEL_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/model.onnx')
 

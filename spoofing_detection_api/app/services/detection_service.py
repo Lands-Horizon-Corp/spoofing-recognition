@@ -46,7 +46,7 @@ async def predict_spoof(upload_file: bytes) -> dict:
 
     if not extracted_data:
         raise ValueError(
-            'the detected face is not frontal enough please try again.')
+            'face forward properly')
 
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
