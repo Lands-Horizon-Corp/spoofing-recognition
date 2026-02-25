@@ -46,8 +46,8 @@ def intercept_and_limit(req: Request):
     # Stash the matched origin for after_request to use
     req_origin = req.headers.get('origin') or ''
     matched_origin = resolve_origin(req_origin)
-    print(f'Matched origin: "{
-          matched_origin}" for request origin: "{req_origin}"')
+    print(f"Matched origin: '{matched_origin}'",
+          f" for request origin: '{req_origin}'")
 
     if req.method == 'OPTIONS':
         return Response(
