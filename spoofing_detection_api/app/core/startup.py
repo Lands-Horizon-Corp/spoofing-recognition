@@ -10,6 +10,10 @@ async def download_model():
     """Downloads the model and params files if they do not exist locally."""
     if os.path.isfile(settings.PARAMS_PATH) and os.path.isfile(settings.MODEL_PATH):
         print('Model and params file found locally, loading params.')
+        assert os.path.isfile(settings.PARAMS_PATH), 'Params file is missing'
+        assert os.path.isfile(settings.MODEL_PATH), 'Model file is missing'
+        assert os.path.isfile(
+            settings.FACE_DETECTOR_MODEL_PATH), 'Face detector model file is missing'
     else:
         print('Params file not found at, downloading needed files.')
 
@@ -32,6 +36,12 @@ async def download_model():
             file_url=settings.SPOOFING_FACE_DETECTOR_DOWNLOAD_URL_ENV,
             file_path=settings.FACE_DETECTOR_MODEL_PATH,
         )
+        assert os.path.isfile(
+            settings.MODEL_PATH), 'Model file was not downloaded successfully'
+        assert os.path.isfile(
+            settings.PARAMS_PATH), 'Params file was not downloaded successfully'
+        assert os.path.isfile(
+            settings.FACE_DETECTOR_MODEL_PATH), 'Face detector file not downloaded successfully'
 
 
 # async def load_model() -> onnxruntime.InferenceSession:

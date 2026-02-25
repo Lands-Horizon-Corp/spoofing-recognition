@@ -45,6 +45,7 @@ allowed_origins_production = [
     'https://e-coop-client-staging.up.railway.app',
 
     'https://spoofing-recognition-development.up.railway.app',
+    'https://e-coop-member-portal-development.up.railway.app'
 ]
 
 allowed_origins_development = [
