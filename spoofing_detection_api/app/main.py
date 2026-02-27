@@ -13,6 +13,7 @@ from spoofdet.verify_memory import print_memory_usage
 
 print_memory_usage('Starting up the API...')
 
+
 app = Robyn(__file__, openapi_file_path=settings.OPENAPI_PATH)
 
 origin = settings.CORS_ALLOW_ORIGINS

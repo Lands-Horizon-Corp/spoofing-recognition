@@ -6,12 +6,10 @@
     "version": "1.0.0"
   },
   "servers": [
-
-    {
-      "url": "https://spoofing-recognition-development.up.railway.app/",
-      "description": "Development server"
+        {
+      "url": "http://localhost:8001",
+      "description": "Local development server"
     }
-
 
   ],
   "paths": {

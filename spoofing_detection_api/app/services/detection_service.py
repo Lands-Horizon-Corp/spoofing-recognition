@@ -48,6 +48,12 @@ async def predict_spoof(upload_file: bytes) -> dict:
         raise ValueError(
             'face forward properly')
 
+    if not extracted_data[0]['is_mouth_detected']:
+        raise ValueError(
+            'mouth not detected, please ensure the face is fully visible and properly aligned')
+    if extracted_data[0]['is_wearing_glasses']:
+        raise ValueError(
+            'glasses detected, please remove glasses and try again')
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
     face_image = np.array(face_image)

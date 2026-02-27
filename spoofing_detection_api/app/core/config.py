@@ -64,6 +64,7 @@ allowed_origins_development = [
 class Settings(BaseSettings):
     PROJECT_NAME: str = 'Spoof Detection API'
     APP_ENV: str = 'production'
+    IS_LOCAL: bool = False
     CORS_ALLOW_ORIGINS: list[str] = []
     CORS_ALLOW_HEADERS: list[str] = allowed_headers
     MODEL_PATH: str = str(
@@ -79,6 +80,13 @@ class Settings(BaseSettings):
     SPOOFING_FACE_DETECTOR_DOWNLOAD_URL_ENV: str = ''
     THRESHOLD: float = 0.5
     OPENAPI_PATH: str = str(BASE_DIR / 'spoofing_detection_api/openapi.json')
+
+    @model_validator(mode='after')
+    def set_openapi_path(self):
+        if self.IS_LOCAL:
+            self.OPENAPI_PATH = str(
+                BASE_DIR / 'spoofing_detection_api/openapi_local.json')
+        return self
 
     @model_validator(mode='after')
     def set_cors_origins(self):
