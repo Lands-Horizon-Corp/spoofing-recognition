@@ -6,6 +6,7 @@ from typing import cast
 
 import numpy as np
 from app.core.config import model_config
+from app.models.emotion_detection import emotion_detector
 from app.models.face_detector_model import face_detector
 from app.models.frontal_face_detector_model import frontal_classifier
 from app.models.spoof_detector_model import spoof_detector
@@ -54,6 +55,15 @@ async def predict_spoof(upload_file: bytes) -> dict:
     if extracted_data[0]['is_wearing_glasses']:
         raise ValueError(
             'glasses detected, please remove glasses and try again')
+    if not extracted_data[0]['is_eyes_open']:
+        raise ValueError(
+            'eyes appear to be closed, please ensure eyes are open and try again')
+    emotion = emotion_detector.detect(image)
+
+    if emotion != 'neutral':
+        raise ValueError(
+            'emotion detected is not neutral, please ensure a neutral expression and try again')
+
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
     face_image = np.array(face_image)

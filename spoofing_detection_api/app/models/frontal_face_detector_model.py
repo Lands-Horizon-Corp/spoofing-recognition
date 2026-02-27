@@ -37,6 +37,16 @@ class FrontalFaceDetectorModel:
 
             is_wearing_glasses = len(
                 self.spectacle_tracker.detectMultiScale(head_region_gray)) > 0
+
+            left_eye_points = face_points[0][0][36:42]
+            right_eye_points = face_points[0][0][42:48]
+
+            aperture_left = self.calculate_eye_aperture(left_eye_points)
+            aperture_right = self.calculate_eye_aperture(right_eye_points)
+
+            average_aperture = (aperture_left + aperture_right) / 2.0
+
+            is_eyes_open = average_aperture > 0.25
             extracted_data.append({
                 'x_coordinate': int(x_val),
                 'y_coordinate': int(y_val),
@@ -44,7 +54,8 @@ class FrontalFaceDetectorModel:
                 'box_height': int(h_val),
                 'is_frontal': True,
                 'is_mouth_detected': is_mouth_detected,
-                'is_wearing_glasses': is_wearing_glasses
+                'is_wearing_glasses': is_wearing_glasses,
+                'is_eyes_open': is_eyes_open
 
             })
         return extracted_data
@@ -57,6 +68,17 @@ class FrontalFaceDetectorModel:
         image_matrix = cv2.resize(
             image_matrix, (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
         return image_matrix
+
+    def calculate_eye_aperture(self, ocular_landmarks):
+        height_left = np.linalg.norm(ocular_landmarks[1] - ocular_landmarks[5])
+        height_right = np.linalg.norm(
+            ocular_landmarks[2] - ocular_landmarks[4])
+
+        width = np.linalg.norm(ocular_landmarks[0] - ocular_landmarks[3])
+
+        aperture_score = (height_left + height_right) / (2.0 * width)
+
+        return aperture_score
 
 
 frontal_classifier = FrontalFaceDetectorModel()
