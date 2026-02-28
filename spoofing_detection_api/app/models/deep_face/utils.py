@@ -7,9 +7,9 @@ import cv2
 import gdown
 import numpy as np
 import onnxruntime
-from config import find_analyis_model_target_size
-from config import find_threshold
-from config import find_verification_model_target_size
+from app.models.deep_face.config import find_analyis_model_target_size
+from app.models.deep_face.config import find_threshold
+from app.models.deep_face.config import find_verification_model_target_size
 from scipy.spatial.distance import cosine
 from scipy.spatial.distance import euclidean
 

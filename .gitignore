@@ -17,3 +17,5 @@ logs
 *.onnx
 *.data
 *.pth
+lbfmodel.yaml
+*.task

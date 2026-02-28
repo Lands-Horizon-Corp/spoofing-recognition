@@ -38,6 +38,7 @@ async def run_on_startup():
     print('Starting up the API...')
     print_memory_usage('Startup Tasks Completed')
     model_config.load_model_params()
+    # dcokfrontal_classifier.load_model()
 
 
 @app.before_request()

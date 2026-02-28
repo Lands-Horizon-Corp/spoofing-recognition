@@ -7,7 +7,10 @@ WORKDIR /code
 COPY ./requirements.txt /code/requirements.txt
 COPY ./pyproject.toml /code/pyproject.toml
 
-
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # 3. Install dependencies
 # seaparete installation of torch to avoid issues with cache and large files

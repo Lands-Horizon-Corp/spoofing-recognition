@@ -58,8 +58,8 @@ async def predict_spoof(upload_file: bytes) -> dict:
     if not extracted_data[0]['is_eyes_open']:
         raise ValueError(
             'eyes appear to be closed, please ensure eyes are open and try again')
-    emotion = emotion_detector.detect(image)
 
+    emotion = emotion_detector.detect(image)
     if emotion != 'neutral':
         raise ValueError(
             'emotion detected is not neutral, please ensure a neutral expression and try again')

@@ -1,85 +1,89 @@
 from __future__ import annotations
 
 import cv2
+import mediapipe as mp
 import numpy as np
-from app.core.config import model_config
-from cv2 import data
-from cv2 import face
+from app.core.config import settings
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 from PIL import Image
 
 
 class FrontalFaceDetectorModel:
     def __init__(self):
-        self.frontal_classifier = cv2.CascadeClassifier(
-            data.haarcascades + 'haarcascade_frontalface_default.xml')
-        self.geometry_mapper = face.createFacemarkLBF()
-        self.spectacle_tracker = cv2.CascadeClassifier(
-            'haarcascade_eye_tree_eyeglasses.xml')
+        base_options = python.BaseOptions(
+            model_asset_path=settings.FACE_LANDMARKS_MODEL_PATH
+        )
+        options = vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE,
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5,
+            output_face_blendshapes=True
+        )
+        self.face_mesh_detector = vision.FaceLandmarker.create_from_options(
+            options)
 
     def detect_frontal_face(self, image: Image.Image) -> list:
-        image_matrix, img_brg = self._preprocess(image)
-        straight_faces = self.frontal_classifier.detectMultiScale(
-            image_matrix, 1.1, 4)
+        image_matrix, img_bgr = self._preprocess(image)
+        landmarks, blendshapes = self.extract_landmarks(image)
+
+        if landmarks.size == 0:
+            return []
+
         extracted_data = []
-        for (x_val, y_val, w_val, h_val) in straight_faces:
 
-            _, face_points = self.geometry_mapper.fit(
-                image_matrix, np.array([[x_val, y_val, w_val, h_val]]))
+        x_val = int(np.min(landmarks[:, 0]))
+        y_val = int(np.min(landmarks[:, 1]))
+        x_max = int(np.max(landmarks[:, 0]))
+        y_max = int(np.max(landmarks[:, 1]))
+        w_val = max(0, x_max - x_val)
+        h_val = max(0, y_max - y_val)
 
-            mouth_keypoints = face_points[0][0][48:68]
-            contour_area = cv2.contourArea(mouth_keypoints)
-            expected_minimum_area = (w_val * h_val) * 0.02
+        right_eye_points, left_eye_points = self.get_eye_points(landmarks)
 
-            is_mouth_detected = contour_area > expected_minimum_area
+        jaw_open_score = blendshapes.get('jawOpen', 0.0)
+        is_mouth_detected = jaw_open_score > 0.15
 
-            head_region_gray = image_matrix[y_val:y_val +
-                                            h_val, x_val:x_val+w_val]
+        is_wearing_glasses = self.check_for_glasses(image_matrix, landmarks)
 
-            is_wearing_glasses = len(
-                self.spectacle_tracker.detectMultiScale(head_region_gray)) > 0
+        # left_visible, right_visible = self.is_eyes_visible(
+        #     img_bgr, left_eye_points, right_eye_points)
+        left_blink_score = blendshapes.get('eyeBlinkLeft', 0.0)
+        right_blink_score = blendshapes.get('eyeBlinkRight', 0.0)
+        is_eyes_open = (
+            left_blink_score < 0.5
+            and right_blink_score < 0.5
+            # and left_visible
+            # and right_visible
+        )
 
-            left_eye_points = face_points[0][0][36:42]
-            right_eye_points = face_points[0][0][42:48]
-
-            aperture_left = self.calculate_eye_aperture(left_eye_points)
-            aperture_right = self.calculate_eye_aperture(right_eye_points)
-            left_visible, right_visible = self.is_eyes_visible(
-                img_brg, left_eye_points, right_eye_points)
-            average_aperture = (aperture_left + aperture_right) / 2.0
-
-            is_eyes_open = average_aperture > 0.25 and left_visible and right_visible
-            extracted_data.append({
-                'x_coordinate': int(x_val),
-                'y_coordinate': int(y_val),
-                'box_width': int(w_val),
-                'box_height': int(h_val),
-                'is_frontal': True,
-                'is_mouth_detected': is_mouth_detected,
-                'is_wearing_glasses': is_wearing_glasses,
-                'is_eyes_open': is_eyes_open
-
-            })
+        extracted_data.append({
+            'x_coordinate': x_val,
+            'y_coordinate': y_val,
+            'box_width': w_val,
+            'box_height': h_val,
+            'is_frontal': True,
+            'is_mouth_detected': is_mouth_detected,
+            'is_wearing_glasses': is_wearing_glasses,
+            'is_eyes_open': is_eyes_open
+        })
         return extracted_data
+
+    def get_eye_points(self, landmarks):
+        right_eye_idx = [33, 160, 158, 133, 153, 144]
+        left_eye_idx = [362, 385, 387, 263, 373, 380]
+
+        right_eye = np.array([landmarks[i] for i in right_eye_idx])
+        left_eye = np.array([landmarks[i] for i in left_eye_idx])
+
+        return right_eye, left_eye
 
     def _preprocess(self, image):
         img_bgr = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        print(f"face image size: {image.size}, "
-              f"matrix shape: {img_bgr.shape}")
         image_matrix = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        image_matrix = cv2.resize(
-            image_matrix, (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
         return image_matrix, img_bgr
-
-    def calculate_eye_aperture(self, ocular_landmarks):
-        height_left = np.linalg.norm(ocular_landmarks[1] - ocular_landmarks[5])
-        height_right = np.linalg.norm(
-            ocular_landmarks[2] - ocular_landmarks[4])
-
-        width = np.linalg.norm(ocular_landmarks[0] - ocular_landmarks[3])
-
-        aperture_score = (height_left + height_right) / (2.0 * width)
-
-        return aperture_score
 
     def check_eye_region_visibility(self, frame, eye_points):
         """
@@ -105,7 +109,7 @@ class FrontalFaceDetectorModel:
         # --- Check 1: Laplacian variance (edge sharpness) ---
         laplacian_var = cv2.Laplacian(gray_region, cv2.CV_64F).var()
         # A covered region (by cloth, hair mass, hand) has low edge variance
-        if laplacian_var < 20:  # tune this threshold
+        if laplacian_var < 10:  # tune this threshold
             return False
 
         # --- Check 2: Sclera/iris color check (white or colored region expected) ---
@@ -116,28 +120,62 @@ class FrontalFaceDetectorModel:
             [0, 0, 180]), np.array([180, 40, 255]))
         white_ratio = np.sum(white_mask > 0) / white_mask.size
 
-        if white_ratio < 0.05:  # at least 5% should be sclera-like
+        if white_ratio < 0.02:  # at least 5% should be sclera-like
             return False
 
         return True
 
-    def is_eyes_visible(self, img_brg, left_eye_points, right_eye_points):
-        orig_h, orig_w = img_brg.shape[:2]
-
-        scale_x = orig_w / model_config.TARGET_SIZE
-        scale_y = orig_h / model_config.TARGET_SIZE
-
-        # Scale eye points
-        left_eye_points_orig = left_eye_points * [scale_x, scale_y]
-        right_eye_points_orig = right_eye_points * [scale_x, scale_y]
-
-        # Now pass the scaled points to visibility check
+    def is_eyes_visible(self, img_bgr, left_eye_points, right_eye_points):
         left_visible = self.check_eye_region_visibility(
-            img_brg, left_eye_points_orig)
+            img_bgr, left_eye_points)
         right_visible = self.check_eye_region_visibility(
-            img_brg, right_eye_points_orig)
+            img_bgr, right_eye_points)
 
         return left_visible, right_visible
+
+    def check_for_glasses(self, image_matrix, face_points):
+        roi_indices = [127, 356, 105, 334, 116, 345]
+
+        pts = face_points[roi_indices]
+
+        eye_top = max(0, int(np.min(pts[:, 1])))
+        eye_bottom = min(image_matrix.shape[0], int(np.max(pts[:, 1])))
+        eye_left = max(0, int(np.min(pts[:, 0])))
+        eye_right = min(image_matrix.shape[1], int(np.max(pts[:, 0])))
+
+        roi = image_matrix[eye_top:eye_bottom, eye_left:eye_right]
+
+        if roi.size == 0:
+            return False
+
+        edges = cv2.Canny(roi, 100, 200)
+        edge_density = np.sum(edges > 0) / edges.size
+
+        return edge_density > 0.1
+
+    def extract_landmarks(self, image: Image.Image) -> tuple[np.ndarray, dict[str, float]]:
+        img_rgb = np.array(image.convert('RGB'))
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+
+        detection_result = self.face_mesh_detector.detect(mp_image)
+        if not detection_result.face_landmarks:
+            return np.array([]), {}
+
+        h, w, _ = img_rgb.shape
+        face_landmarks = detection_result.face_landmarks[0]
+
+        pixel_points = []
+        for landmark in face_landmarks:
+            x = int(landmark.x * w)
+            y = int(landmark.y * h)
+            pixel_points.append([x, y])
+
+        blendshapes: dict[str, float] = {}
+        if detection_result.face_blendshapes:
+            for category in detection_result.face_blendshapes[0]:
+                blendshapes[category.category_name] = category.score
+
+        return np.array(pixel_points), blendshapes
 
 
 frontal_classifier = FrontalFaceDetectorModel()

@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     IS_LOCAL: bool = False
     CORS_ALLOW_ORIGINS: list[str] = []
     CORS_ALLOW_HEADERS: list[str] = allowed_headers
+    FACE_LANDMARKS_MODEL_PATH: str = str(
+        BASE_DIR / 'spoofing_detection_api/models/face_landmarker.task')
+    LBF_MODEL_PATH: str = str(
+        BASE_DIR / 'spoofing_detection_api/models/lbfmodel.yaml')
     MODEL_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/model.onnx')
 
