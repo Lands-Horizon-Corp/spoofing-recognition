@@ -144,7 +144,7 @@ class FaceAnalysis:
         else:
             raise ValueError(f"unimplemented model name - {self.model_name}")
 
-    def predict(self, input):
+    def predict(self, input) -> str | int:
         input = self.preprocess(input)
         result = self.model.run([self.output_name], {self.input_name: input})
         result = self.postprocess(result)
