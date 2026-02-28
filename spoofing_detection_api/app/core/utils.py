@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import requests  # type: ignore
 
 
@@ -16,3 +17,7 @@ async def download_file(file_url: str, file_path: str):
         print(f'Model downloaded successfully to {file_path}')
     except requests.exceptions.RequestException as e:
         print(f'Error downloading model: {e}')
+
+
+def calculate_sigmoid(x):
+    return 1 / (1 + np.exp(-x))

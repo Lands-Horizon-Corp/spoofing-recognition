@@ -4,11 +4,8 @@ import numpy as np
 import onnxruntime as ort
 from app.core.config import model_config
 from app.core.config import settings
+from app.core.utils import calculate_sigmoid
 from spoofdet.verify_memory import print_memory_usage
-
-
-def calculate_sigmoid(x):
-    return 1 / (1 + np.exp(-x))
 
 
 class SpoofDetector:

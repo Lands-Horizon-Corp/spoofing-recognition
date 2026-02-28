@@ -10,6 +10,7 @@ from app.core.config import model_config
 from app.models.emotion_detection import emotion_detector
 from app.models.face_detector_model import face_detector
 from app.models.frontal_face_detector_model import frontal_classifier
+from app.models.glass_detector_model import glass_detector
 from app.models.spoof_detector_model import spoof_detector
 from PIL import Image
 
@@ -59,9 +60,12 @@ async def predict_spoof(upload_file: bytes) -> dict:
     if not extracted_data[0]['is_mouth_detected']:
         raise ValueError(
             'mouth not detected, please ensure the face is fully visible and properly aligned')
-    if extracted_data[0]['is_wearing_glasses']:
+
+    is_glass = glass_detector.predict(face_image)
+    if not is_glass:
         raise ValueError(
             'glasses detected, please remove glasses and try again')
+
     if not extracted_data[0]['is_eyes_open']:
         raise ValueError(
             'eyes appear to be closed, please ensure eyes are open and try again')
