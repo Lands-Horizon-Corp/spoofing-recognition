@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 from typing import cast
 
 import numpy as np
@@ -11,6 +12,8 @@ from app.models.face_detector_model import face_detector
 from app.models.frontal_face_detector_model import frontal_classifier
 from app.models.spoof_detector_model import spoof_detector
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 
 async def predict_spoof(upload_file: bytes) -> dict:
@@ -41,13 +44,17 @@ async def predict_spoof(upload_file: bytes) -> dict:
     face = faces[0]
     left, top, right, bottom = face['bbox']
     print(f"bbox: {face['bbox']}, image size: {image.size}")
-    extracted_data = frontal_classifier.detect_frontal_face(image)
+    extracted_data = frontal_classifier.detect_proper_face_pipeline(image)
     face_image = image.crop((left, top, right, bottom))
     print(f"Cropped face image size: {face_image.size}")
 
     if not extracted_data:
         raise ValueError(
             'face forward properly')
+    if not extracted_data[0]['is_frontal']:
+        print(f"Frontal face detection data: {extracted_data}")
+        raise ValueError(
+            'face not detected as frontal, please face forward properly and try again')
 
     if not extracted_data[0]['is_mouth_detected']:
         raise ValueError(
@@ -59,7 +66,8 @@ async def predict_spoof(upload_file: bytes) -> dict:
         raise ValueError(
             'eyes appear to be closed, please ensure eyes are open and try again')
 
-    emotion = emotion_detector.detect(image)
+    emotion = emotion_detector.detect(face_image)
+    print(f"Emotion analysis result: {emotion}")
     if emotion != 'neutral':
         raise ValueError(
             'emotion detected is not neutral, please ensure a neutral expression and try again')
@@ -69,7 +77,8 @@ async def predict_spoof(upload_file: bytes) -> dict:
     face_image = np.array(face_image)
     prediction, spoof_confidence = await asyncio.to_thread(
         spoof_detector.predict, face_image)
-
+    logger.info(f"Prediction: {prediction}, Spoof Confidence: {
+                spoof_confidence}")
     return {
         'is_spoof': bool(prediction),
         'spoof_confidence': float(spoof_confidence),

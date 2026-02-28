@@ -2,6 +2,14 @@
 
 ## Deployment
 
+
+
+### for devs
+
+```cmd
+docker compose -f docker-compose.dev.yaml up
+```
+
 ### Configuration (.env)
 add the env file on spoofing_detection_api folder
 ```env variables

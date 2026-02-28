@@ -129,6 +129,9 @@ class FaceAnalysis:
         if self.model_name == 'emotion':
             labels = ['angry', 'disgust', 'fear',
                       'happy', 'sad', 'surprise', 'neutral']
+            for i, label in enumerate(labels):
+                print(f"{label}: {output[0][0][i]:.4f}")
+
             return labels[np.argmax(output)]
         elif self.model_name == 'age':
             output_indexes = np.array(list(range(0, 101)))

@@ -1,6 +1,5 @@
 services:
   spoofing_detection_api:
-    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
