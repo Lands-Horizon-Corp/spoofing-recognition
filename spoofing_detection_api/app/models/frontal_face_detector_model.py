@@ -17,21 +17,27 @@ logger = logging.getLogger(__name__)
 
 class ProperFaceDetector:
     def __init__(self):
-        base_options = python.BaseOptions(
-            model_asset_path=settings.FACE_LANDMARKS_MODEL_PATH
-        )
-        options = vision.FaceLandmarkerOptions(
-            base_options=base_options,
-            running_mode=vision.RunningMode.IMAGE,
-            num_faces=1,
-            min_face_detection_confidence=0.5,
-            min_face_presence_confidence=0.5,
-            output_face_blendshapes=True
-        )
-        self.face_mesh_detector = vision.FaceLandmarker.create_from_options(
-            options)
+
+        self.face_mesh_detector = None
+
         self.frontal_classifier = cv2.CascadeClassifier(
             data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    def load_model(self):
+        if self.face_mesh_detector is None:
+            base_options = python.BaseOptions(
+                model_asset_path=settings.FACE_LANDMARKS_MODEL_PATH
+            )
+            options = vision.FaceLandmarkerOptions(
+                base_options=base_options,
+                running_mode=vision.RunningMode.IMAGE,
+                num_faces=1,
+                min_face_detection_confidence=0.5,
+                min_face_presence_confidence=0.5,
+                output_face_blendshapes=True
+            )
+            self.face_mesh_detector = vision.FaceLandmarker.create_from_options(
+                options)
 
     def is_frontal_face(self, image_matrix) -> bool:
         frontal_faces = self.frontal_classifier.detectMultiScale(
@@ -361,7 +367,8 @@ class ProperFaceDetector:
     def extract_landmarks(self, image: Image.Image) -> tuple[np.ndarray, dict[str, float],  list[Any]]:  # noqa: E501
         img_rgb = np.array(image.convert('RGB'))
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
-
+        self.load_model()
+        assert self.face_mesh_detector is not None, 'Face mesh detector model is not loaded'
         detection_result = self.face_mesh_detector.detect(mp_image)
         if not detection_result.face_landmarks:
             return np.array([]), {}, detection_result
