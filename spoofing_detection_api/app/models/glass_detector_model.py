@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import onnxruntime
+from app.core.config import settings
 from app.core.utils import calculate_sigmoid
 from PIL import Image
 
@@ -15,7 +16,7 @@ class GlassDetectorModel:
         if not self.is_model_loaded:
             # Load the ONNX model here
             self.model = onnxruntime.InferenceSession(
-                'path_to_your_model.onnx')
+                settings.GLASS_DETECTOR_MODEL_PATH)
             self.is_model_loaded = True
 
     def predict(self, img: Image.Image) -> bool:
@@ -23,11 +24,14 @@ class GlassDetectorModel:
         assert self.model is not None, 'Model is not loaded.'
         img_array = self.preprocess(img)
         outputs = self.model.run(None, {'input': img_array})
-        logits = outputs[0]
-        result = calculate_sigmoid(logits) > 0.5
+        print(f"Raw model output: {outputs}")
+        logit = np.array(outputs[0]).flatten()[
+            0]  # Extract single scalar value
+        confidence = calculate_sigmoid(logit)
+        result = confidence > 0.3
         print(
             f"Glass detection result: {result}",
-            f"confidence: {calculate_sigmoid(logits)}")
+            f"confidence: {confidence}")
         return result
 
     def preprocess(self, image: Image.Image) -> np.ndarray:

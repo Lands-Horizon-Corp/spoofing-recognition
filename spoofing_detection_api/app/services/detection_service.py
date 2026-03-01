@@ -61,8 +61,8 @@ async def predict_spoof(upload_file: bytes) -> dict:
         raise ValueError(
             'mouth not detected, please ensure the face is fully visible and properly aligned')
 
-    is_glass = glass_detector.predict(face_image)
-    if not is_glass:
+    have_glass = glass_detector.predict(face_image)
+    if have_glass:
         raise ValueError(
             'glasses detected, please remove glasses and try again')
 
@@ -81,8 +81,8 @@ async def predict_spoof(upload_file: bytes) -> dict:
     face_image = np.array(face_image)
     prediction, spoof_confidence = await asyncio.to_thread(
         spoof_detector.predict, face_image)
-    logger.info(f"Prediction: {prediction}, Spoof Confidence: {
-                spoof_confidence}")
+    logger.info(f"Prediction: {prediction},"
+                f"Spoof Confidence: {spoof_confidence}")
     return {
         'is_spoof': bool(prediction),
         'spoof_confidence': float(spoof_confidence),
