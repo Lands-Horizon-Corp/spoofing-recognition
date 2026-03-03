@@ -45,13 +45,16 @@ async def ping():
 async def detect_spoof(request: Request):
     """Endpoint to detect spoofing in an uploaded image"""
     # Debug: Print available files)
-
+    origin = request.headers.get('origin')
+    cors_req = request.headers.get('access-control-request-method')
+    allowed_origin = resolve_origin(origin)
+    headers = header_builder(allowed_origin, cors_req)
     img = get_image(request)
     if not img:
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
-            headers={'Content-Type': 'application/json'},
-            description='{"error": "No file uploaded"}'
+            headers=headers,
+            description='{"code": "ERR_NO_FILE_UPLOADED"}'
         )
 
     try:
@@ -60,11 +63,15 @@ async def detect_spoof(request: Request):
         print_memory_usage('Error during prediction')
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
-            headers={'Content-Type': 'application/json'},
+            headers=headers,
             description=f'{{"code": "{str(e)}"}}'
         )
     print_memory_usage('Prediction completed')
-    return result
+    return Response(
+        status_code=HTTPStatus.OK.value,
+        headers=headers,
+        description=str(result)
+    )
 
 
 @router.post('/detect/verbose')
@@ -82,7 +89,7 @@ async def detect_spoof_verbose(request: Request):
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
             headers=headers,
-            description='{"error": "No file uploaded"}'
+            description='{"code": "ERR_NO_FILE_UPLOADED"}'
         )
 
     try:
@@ -91,14 +98,14 @@ async def detect_spoof_verbose(request: Request):
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
             headers=headers,
-            description=f'{{"error": "{str(e)}"}}'
+            description=f'{{"code": "{str(e)}"}}'
         )
 
     if result['is_spoof']:
         return Response(
             status_code=SpoofVerboseHTTPStatus.SPOOF_DETECTED.value,
             headers=headers,
-            description='spoof detected'
+            description='{"code": "SPOOF_DETECTED"}'
         )
 
     return Response(

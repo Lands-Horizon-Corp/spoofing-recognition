@@ -39,9 +39,9 @@ async def predict_spoof(upload_file: bytes) -> dict:
     faces = await asyncio.to_thread(
         face_detector.find_faces, image)
     if not faces:
-        raise ValueError('No faces detected in the image.')
+        raise ValueError('ERR_NO_FACE')
     if len(faces) > 1:
-        raise ValueError('Multiple faces detected.')
+        raise ValueError('ERR_MULTIPLE_FACES')
     face = faces[0]
     left, top, right, bottom = face['bbox']
     print(f"bbox: {face['bbox']}, image size: {image.size}")
