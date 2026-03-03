@@ -51,30 +51,30 @@ async def predict_spoof(upload_file: bytes) -> dict:
 
     if not extracted_data:
         raise ValueError(
-            'face forward properly')
+            'ERR_NO_FACE')
     if not extracted_data[0]['is_frontal']:
         print(f"Frontal face detection data: {extracted_data}")
         raise ValueError(
-            'face not detected as frontal, please face forward properly and try again')
+            'ERR_FACE_NOT_FRONTAL')
 
     if not extracted_data[0]['is_mouth_detected']:
         raise ValueError(
-            'mouth not detected, please ensure the face is fully visible and properly aligned')
+            'ERR_MOUTH_NOT_DETECTED')
 
     have_glass = glass_detector.predict(face_image)
     if have_glass:
         raise ValueError(
-            'glasses detected, please remove glasses and try again')
+            'ERR_GLASSES_DETECTED')
 
     if not extracted_data[0]['is_eyes_open']:
         raise ValueError(
-            'eyes appear to be closed, please ensure eyes are open and try again')
+            'ERR_EYES_CLOSED')
 
     emotion = emotion_detector.detect(face_image)
     print(f"Emotion analysis result: {emotion}")
     if emotion != 'neutral':
         raise ValueError(
-            'emotion detected is not neutral, please ensure a neutral expression and try again')
+            'ERR_EMOTION_NOT_NEUTRAL')
 
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import filetype
 from app.core.constants.http_status import HTTPStatus
 from app.core.constants.http_status import SpoofVerboseHTTPStatus
@@ -24,6 +22,20 @@ def is_image_file(file: bytes) -> bool:
     return file_Info is not None and file_Info.mime.startswith('image/')
 
 
+def get_image(request: Request) -> bytes | None:
+    """Extract the image file from the request."""
+    files = request.files
+    if not files:
+        return None
+    file_names = list(files.keys())
+    if not file_names:
+        return None
+    first_key = file_names[0]
+    if not is_image_file(files[first_key]):
+        return None
+    return files[first_key]
+
+
 @router.get('/ping')
 async def ping():
     return {'ping': 'pong'}
@@ -32,19 +44,14 @@ async def ping():
 @router.post('/detect')
 async def detect_spoof(request: Request):
     """Endpoint to detect spoofing in an uploaded image"""
-    files = request.files
-    file_names = files.keys()
-    print({'file_names': list(file_names)})
-    first_key = list(file_names)[0]
-    img = files[first_key]
     # Debug: Print available files)
 
-    if not is_image_file(img):
-        print_memory_usage('Error during prediction')
+    img = get_image(request)
+    if not img:
         return Response(
-            status_code=400,
+            status_code=HTTPStatus.BAD_REQUEST.value,
             headers={'Content-Type': 'application/json'},
-            description='{"error": "File must be an image"}'
+            description='{"error": "No file uploaded"}'
         )
 
     try:
@@ -52,9 +59,9 @@ async def detect_spoof(request: Request):
     except ValueError as e:
         print_memory_usage('Error during prediction')
         return Response(
-            status_code=400,
+            status_code=HTTPStatus.BAD_REQUEST.value,
             headers={'Content-Type': 'application/json'},
-            description=f'{{"error": "{str(e)}"}}'
+            description=f'{{"code": "{str(e)}"}}'
         )
     print_memory_usage('Prediction completed')
     return result
@@ -62,57 +69,27 @@ async def detect_spoof(request: Request):
 
 @router.post('/detect/verbose')
 async def detect_spoof_verbose(request: Request):
-    """Endpoint to detect spoofing and return 204 if live, 401 if spoof"""
-    # Try to get the file with 'file' key
-    files = request.files
-    file_names = list(files.keys())
-    print('POST: /detect/verbose', {'file_names': file_names})
+    """Endpoint to detect spoofing and return 204 if live, 401 if spoof, and 400 for errors"""
 
+    img = get_image(request)
     origin = request.headers.get('origin')
+    cors_req = request.headers.get('access-control-request-method')
     allowed_origin = resolve_origin(origin)
-    headers = header_builder(allowed_origin)
+    headers = header_builder(allowed_origin, cors_req)
     print(f"Request origin: {origin}")
 
-    if not file_names:
+    if not img:
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
             headers=headers,
             description='{"error": "No file uploaded"}'
         )
 
-    first_key = file_names[0]
-    img = files[first_key]
-
-    if not img:
-        available_keys = list(request.files.keys()) if request.files else []
-        error = 'No file uploaded'
-        descriptions = json.dumps({'error': error, 'details': available_keys})
-        return Response(
-            status_code=HTTPStatus.BAD_REQUEST.value,
-            headers=headers,
-            description=descriptions
-        )
-
-    if not is_image_file(img):
-        return Response(
-            status_code=HTTPStatus.BAD_REQUEST.value,
-            headers=headers,
-            description='{"error": "File must be an image"}'
-        )
-
     try:
         result = await predict_spoof(img)
     except ValueError as e:
-        if 'No faces detected' in str(e):
-            status_code = SpoofVerboseHTTPStatus.NO_FACE.value
-        elif 'Multiple faces detected' in str(e):
-            status_code = SpoofVerboseHTTPStatus.MULTIPLE_FACES.value
-        elif 'face forward properly' in str(e):
-            status_code = SpoofVerboseHTTPStatus.NOT_FRONTAL.value
-        else:
-            status_code = HTTPStatus.BAD_REQUEST.value
         return Response(
-            status_code=status_code,
+            status_code=HTTPStatus.BAD_REQUEST.value,
             headers=headers,
             description=f'{{"error": "{str(e)}"}}'
         )
