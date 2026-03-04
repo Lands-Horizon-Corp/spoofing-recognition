@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     CORS_ALLOW_ORIGINS: list[str] = []
     CORS_ALLOW_HEADERS: list[str] = allowed_headers
     GLASS_DETECTOR_MODEL_PATH: str = str(
-        BASE_DIR / 'spoofing_detection_api/models/glasses_classifier_single.onnx')
+        BASE_DIR / 'spoofing_detection_api/models/glass_detector.onnx')
     FACE_LANDMARKS_MODEL_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/face_landmarker.task')
     LBF_MODEL_PATH: str = str(
@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     PARAMS_PATH: str = str(
         BASE_DIR / 'spoofing_detection_api/models/params.json')
     FACE_DETECTOR_MODEL_PATH: str = str(
-        BASE_DIR / 'spoofing_detection_api/models/version-RFB-320_without_postprocessing.onnx')
+        BASE_DIR / 'spoofing_detection_api/models/face_detector.onnx')
     API_V1_PREFIX: str = '/api/v1'
     SPOOFING_MODEL_DOWNLOADS_URL_ENV: str = ''
     SPOOFING_PARAMS_DOWNLOAD_URL_ENV: str = ''
