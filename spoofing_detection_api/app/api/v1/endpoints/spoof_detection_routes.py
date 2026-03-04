@@ -66,6 +66,13 @@ async def detect_spoof(request: Request):
             headers=headers,
             description=f'{{"code": "{str(e)}"}}'
         )
+    if result['is_spoof']:
+        print_memory_usage('Spoof detected')
+        return Response(
+            status_code=HTTPStatus.UNAUTHORIZED.value,
+            headers=headers,
+            description='{"code": "SPOOF_DETECTED"}'
+        )
     print_memory_usage('Prediction completed')
     return Response(
         status_code=HTTPStatus.OK.value,

@@ -19,4 +19,4 @@ class SpoofVerboseHTTPStatus(enum.Enum):
     NO_FACE = 405
     MULTIPLE_FACES = 406
     NOT_FRONTAL = 407
-    SPOOF_DETECTED = 403
+    SPOOF_DETECTED = 401
