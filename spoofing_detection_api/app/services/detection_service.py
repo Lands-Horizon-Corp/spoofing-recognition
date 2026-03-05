@@ -72,7 +72,7 @@ async def predict_spoof(upload_file: bytes) -> dict:
 
     emotion = emotion_detector.detect(face_image)
     print(f"Emotion analysis result: {emotion}")
-    if emotion != 'neutral':
+    if emotion != 'neutral' and emotion != 'happy':
         raise ValueError(
             'ERR_EMOTION_NOT_NEUTRAL')
     face_image = face_image.resize(
