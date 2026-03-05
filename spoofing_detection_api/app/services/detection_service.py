@@ -9,8 +9,8 @@ import numpy as np
 from app.core.config import model_config
 from app.models.emotion_detection import emotion_detector
 from app.models.face_detector_model import face_detector
-from app.models.frontal_face_detector_model import frontal_classifier
 from app.models.glass_detector_model import glass_detector
+from app.models.proper_face_detector import proper_face_detector
 from app.models.spoof_detector_model import spoof_detector
 from PIL import Image
 
@@ -44,7 +44,7 @@ async def predict_spoof(upload_file: bytes) -> dict:
     face = faces[0]
     left, top, right, bottom = face['bbox']
     print(f"bbox: {face['bbox']}, image size: {image.size}")
-    extracted_data = frontal_classifier.detect_proper_face_pipeline(image)
+    extracted_data = proper_face_detector.detect_proper_face_pipeline(image)
     face_image = image.crop((left, top, right, bottom))
 
     print(f"Cropped face image size: {face_image.size}")
