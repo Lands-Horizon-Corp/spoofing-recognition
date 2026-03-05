@@ -28,7 +28,7 @@ class GlassDetectorModel:
         logit = np.array(outputs[0]).flatten()[
             0]  # Extract single scalar value
         confidence = calculate_sigmoid(logit)
-        result = confidence > 0.3
+        result = confidence > 0.5
         print(
             f"Glass detection result: {result}",
             f"confidence: {confidence}")
