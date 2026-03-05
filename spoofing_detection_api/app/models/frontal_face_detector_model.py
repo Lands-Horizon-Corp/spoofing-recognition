@@ -79,11 +79,16 @@ class ProperFaceDetector:
         h_val = max(0, y_max - y_val)
 
         right_eye_points, left_eye_points = self.get_eye_points(landmarks)
+        jaw_open = blendshapes.get('jawOpen', 0.0)
 
-        jaw_open_score = blendshapes.get('jawOpen', 0.0)
-        is_mouth_detected = jaw_open_score > 0.15
+        upper_lip = blendshapes.get('mouthUpperUpLeft', 0.0) + \
+            blendshapes.get('mouthUpperUpRight', 0.0)
+        lower_lip = blendshapes.get('mouthLowerDownLeft', 0.0) + \
+            blendshapes.get('mouthLowerDownRight', 0.0)
 
-        is_wearing_glasses = self.check_for_glasses(image_matrix, landmarks)
+        # If any of these show significant movement, the mouth is likely open
+        is_mouth_detected = (jaw_open > 0.10) or (
+            upper_lip > 0.2) or (lower_lip > 0.2)
 
         # left_visible, right_visible = self.is_eyes_visible(
         #     img_bgr, left_eye_points, right_eye_points)
@@ -103,7 +108,6 @@ class ProperFaceDetector:
             'box_height': h_val,
             'is_frontal': self.is_frontal_face(image_matrix),
             'is_mouth_detected': is_mouth_detected,
-            'is_wearing_glasses': is_wearing_glasses,
             'is_eyes_open': is_eyes_open
         })
         return extracted_data
@@ -170,189 +174,189 @@ class ProperFaceDetector:
 
         return left_visible, right_visible
 
-    def check_for_glasses(self, image_matrix, face_points):
-        """
-        Detect glasses using multiple methods.
-        Robust to different face angles.
-        """
-        h, w = image_matrix.shape[:2]
+    # def check_for_glasses(self, image_matrix, face_points):
+    #     """
+    #     Detect glasses using multiple methods.
+    #     Robust to different face angles.
+    #     """
+    #     h, w = image_matrix.shape[:2]
 
-        left_eye_indices = [33, 133, 157, 158, 159, 160,
-                            161, 246, 7, 163, 144, 145, 153, 154, 155]
-        right_eye_indices = [362, 263, 384, 385, 386, 387,
-                             388, 466, 249, 390, 373, 374, 380, 381, 382]
-        nose_bridge_indices = [168, 6, 197, 195, 5]
+    #     left_eye_indices = [33, 133, 157, 158, 159, 160,
+    #                         161, 246, 7, 163, 144, 145, 153, 154, 155]
+    #     right_eye_indices = [362, 263, 384, 385, 386, 387,
+    #                          388, 466, 249, 390, 373, 374, 380, 381, 382]
+    #     nose_bridge_indices = [168, 6, 197, 195, 5]
 
-        # Wider ROI covering eyebrow-to-cheek area for angled faces
-        left_wide_indices = [70, 63, 105, 66, 107, 55, 65,
-                             52, 53, 46, 124, 35, 111, 117, 118, 119, 120, 121, 128]
-        right_wide_indices = [300, 293, 334, 296, 336, 285, 295,
-                              282, 283, 276, 353, 265, 340, 346, 347, 348, 349, 350, 357]
+    #     # Wider ROI covering eyebrow-to-cheek area for angled faces
+    #     left_wide_indices = [70, 63, 105, 66, 107, 55, 65,
+    #                          52, 53, 46, 124, 35, 111, 117, 118, 119, 120, 121, 128]
+    #     right_wide_indices = [300, 293, 334, 296, 336, 285, 295,
+    #                           282, 283, 276, 353, 265, 340, 346, 347, 348, 349, 350, 357]
 
-        def get_roi(indices, padding=20):
-            pts = face_points[indices]
-            x_min = max(0, int(np.min(pts[:, 0])) - padding)
-            x_max = min(w, int(np.max(pts[:, 0])) + padding)
-            y_min = max(0, int(np.min(pts[:, 1])) - padding)
-            y_max = min(h, int(np.max(pts[:, 1])) + padding)
-            return image_matrix[y_min:y_max, x_min:x_max]
+        # def get_roi(indices, padding=20):
+        #     pts = face_points[indices]
+        #     x_min = max(0, int(np.min(pts[:, 0])) - padding)
+        #     x_max = min(w, int(np.max(pts[:, 0])) + padding)
+        #     y_min = max(0, int(np.min(pts[:, 1])) - padding)
+        #     y_max = min(h, int(np.max(pts[:, 1])) + padding)
+        #     return image_matrix[y_min:y_max, x_min:x_max]
 
-        left_roi = get_roi(left_eye_indices)
-        right_roi = get_roi(right_eye_indices)
-        left_wide_roi = get_roi(left_wide_indices, padding=10)
-        right_wide_roi = get_roi(right_wide_indices, padding=10)
-        nose_roi = get_roi(nose_bridge_indices, padding=10)
+        # left_roi = get_roi(left_eye_indices)
+        # right_roi = get_roi(right_eye_indices)
+        # left_wide_roi = get_roi(left_wide_indices, padding=10)
+        # right_wide_roi = get_roi(right_wide_indices, padding=10)
+        # nose_roi = get_roi(nose_bridge_indices, padding=10)
 
-        if left_roi.size == 0 or right_roi.size == 0:
-            return False
+        # if left_roi.size == 0 or right_roi.size == 0:
+        #     return False
 
-        left_indicators = 0
-        right_indicators = 0
-        nose_bridge_indicator = False
+        # left_indicators = 0
+        # right_indicators = 0
+        # nose_bridge_indicator = False
 
-        for roi, wide_roi, side in [(left_roi, left_wide_roi, 'left'),
-                                    (right_roi, right_wide_roi, 'right')]:
-            count = 0
+        # for roi, wide_roi, side in [(left_roi, left_wide_roi, 'left'),
+        #                             (right_roi, right_wide_roi, 'right')]:
+        #     count = 0
 
-            blurred = cv2.GaussianBlur(roi, (3, 3), 0)
+        #     blurred = cv2.GaussianBlur(roi, (3, 3), 0)
 
-            # --- Method 1: Multi-angle edge detection ---
-            edges = cv2.Canny(blurred, 50, 150)  # Raised from (30, 100)
-            edge_density = np.sum(edges > 0) / max(edges.size, 1)
+        #     # --- Method 1: Multi-angle edge detection ---
+        #     edges = cv2.Canny(blurred, 50, 150)  # Raised from (30, 100)
+        #     edge_density = np.sum(edges > 0) / max(edges.size, 1)
 
-            if edge_density > 0.18:  # Raised from 0.10
-                count += 1
-                logger.debug(
-                    f"{side} eye - edge density: {edge_density:.3f} (PASS)")
-            else:
-                logger.debug(f"{side} eye - edge density: {edge_density:.3f}")
+        #     if edge_density > 0.18:  # Raised from 0.10
+        #         count += 1
+        #         logger.debug(
+        #             f"{side} eye - edge density: {edge_density:.3f} (PASS)")
+        #     else:
+        #         logger.debug(f"{side} eye - edge density: {edge_density:.3f}")
 
-            # --- Method 2: Line detection at ALL angles using HoughLinesP ---
-            lines = cv2.HoughLinesP(
-                edges, rho=1, theta=np.pi / 180,
-                # Stricter: threshold 10->15, minLen 8->12, maxGap 5->3
-                threshold=15, minLineLength=12, maxLineGap=3
-            )
-            long_lines = 0
-            if lines is not None:
-                for line in lines:
-                    x1, y1, x2, y2 = line[0]
-                    length = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-                    if length > 15:  # Raised from 10
-                        long_lines += 1
+        #     # --- Method 2: Line detection at ALL angles using HoughLinesP ---
+        #     lines = cv2.HoughLinesP(
+        #         edges, rho=1, theta=np.pi / 180,
+        #         # Stricter: threshold 10->15, minLen 8->12, maxGap 5->3
+        #         threshold=15, minLineLength=12, maxLineGap=3
+        #     )
+        #     long_lines = 0
+        #     if lines is not None:
+        #         for line in lines:
+        #             x1, y1, x2, y2 = line[0]
+        #             length = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+        #             if length > 15:  # Raised from 10
+        #                 long_lines += 1
 
-            if long_lines >= 5:  # Raised from 3
-                count += 1
-                logger.debug(f"{side} eye - long lines: {long_lines} (PASS)")
-            else:
-                logger.debug(f"{side} eye - long lines: {long_lines}")
+        #     if long_lines >= 5:  # Raised from 3
+        #         count += 1
+        #         logger.debug(f"{side} eye - long lines: {long_lines} (PASS)")
+        #     else:
+        #         logger.debug(f"{side} eye - long lines: {long_lines}")
 
-            # --- Method 3: Contour-based frame detection ---
-            contours, _ = cv2.findContours(
-                edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            large_contours = [c for c in contours if cv2.arcLength(
-                c, True) > 50]  # Raised from 30
+        #     # --- Method 3: Contour-based frame detection ---
+        #     contours, _ = cv2.findContours(
+        #         edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #     large_contours = [c for c in contours if cv2.arcLength(
+        #         c, True) > 50]  # Raised from 30
 
-            if len(large_contours) >= 3:  # Raised from 2
-                count += 1
-                logger.debug(
-                    f"{side} eye - large contours: {len(large_contours)} (PASS)")
-            else:
-                logger.debug(
-                    f"{side} eye - large contours: {len(large_contours)}")
+        #     if len(large_contours) >= 3:  # Raised from 2
+        #         count += 1
+        #         logger.debug(
+        #             f"{side} eye - large contours: {len(large_contours)} (PASS)")
+        #     else:
+        #         logger.debug(
+        #             f"{side} eye - large contours: {len(large_contours)}")
 
-            # --- Method 4: Reflection/glare detection ---
-            _, bright = cv2.threshold(
-                roi, 220, 255, cv2.THRESH_BINARY)  # Raised from 200
-            bright_ratio = np.sum(bright > 0) / max(bright.size, 1)
+        #     # --- Method 4: Reflection/glare detection ---
+        #     _, bright = cv2.threshold(
+        #         roi, 220, 255, cv2.THRESH_BINARY)  # Raised from 200
+        #     bright_ratio = np.sum(bright > 0) / max(bright.size, 1)
 
-            if 0.01 < bright_ratio < 0.15:  # Narrowed from (0.005, 0.2)
-                count += 1
-                logger.debug(
-                    f"{side} eye - bright_ratio: {bright_ratio:.4f} (PASS)")
-            else:
-                logger.debug(f"{side} eye - bright_ratio: {bright_ratio:.4f}")
+        #     if 0.01 < bright_ratio < 0.15:  # Narrowed from (0.005, 0.2)
+        #         count += 1
+        #         logger.debug(
+        #             f"{side} eye - bright_ratio: {bright_ratio:.4f} (PASS)")
+        #     else:
+        #         logger.debug(f"{side} eye - bright_ratio: {bright_ratio:.4f}")
 
-            # --- Method 5: Gradient magnitude (detects frame edges at any angle) ---
-            grad_x = cv2.Sobel(blurred, cv2.CV_64F, 1, 0, ksize=3)
-            grad_y = cv2.Sobel(blurred, cv2.CV_64F, 0, 1, ksize=3)
-            gradient_mag = np.sqrt(grad_x ** 2 + grad_y ** 2)
-            avg_gradient = np.mean(gradient_mag)
+        #     # --- Method 5: Gradient magnitude (detects frame edges at any angle) ---
+        #     grad_x = cv2.Sobel(blurred, cv2.CV_64F, 1, 0, ksize=3)
+        #     grad_y = cv2.Sobel(blurred, cv2.CV_64F, 0, 1, ksize=3)
+        #     gradient_mag = np.sqrt(grad_x ** 2 + grad_y ** 2)
+        #     avg_gradient = np.mean(gradient_mag)
 
-            if avg_gradient > 40:  # Raised from 25
-                count += 1
-                logger.debug(
-                    f"{side} eye - avg gradient: {avg_gradient:.2f} (PASS)")
-            else:
-                logger.debug(f"{side} eye - avg gradient: {avg_gradient:.2f}")
+        #     if avg_gradient > 40:  # Raised from 25
+        #         count += 1
+        #         logger.debug(
+        #             f"{side} eye - avg gradient: {avg_gradient:.2f} (PASS)")
+        #     else:
+        #         logger.debug(f"{side} eye - avg gradient: {avg_gradient:.2f}")
 
-            # --- Method 6: Temple frame detection (wider ROI) ---
-            if wide_roi.size > 0:
-                wide_blurred = cv2.GaussianBlur(wide_roi, (3, 3), 0)
-                # Raised from (40, 120)
-                wide_edges = cv2.Canny(wide_blurred, 50, 150)
-                # Check for diagonal/angled lines (temple arms)
-                wide_lines = cv2.HoughLinesP(
-                    wide_edges, rho=1, theta=np.pi / 180,
-                    # Stricter: threshold 8->12, minLen 12->18, maxGap 5->3
-                    threshold=12, minLineLength=18, maxLineGap=3
-                )
-                angled_lines = 0
-                if wide_lines is not None:
-                    for line in wide_lines:
-                        x1, y1, x2, y2 = line[0]
-                        length = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-                        if length > 20:  # Raised from 15
-                            dx = abs(x2 - x1)
-                            dy = abs(y2 - y1)
-                            # Angled line (not purely H or V)
-                            if dx > 5 and dy > 5:  # Raised from 3
-                                angled_lines += 1
+        #     # --- Method 6: Temple frame detection (wider ROI) ---
+        #     if wide_roi.size > 0:
+        #         wide_blurred = cv2.GaussianBlur(wide_roi, (3, 3), 0)
+        #         # Raised from (40, 120)
+        #         wide_edges = cv2.Canny(wide_blurred, 50, 150)
+        #         # Check for diagonal/angled lines (temple arms)
+        #         wide_lines = cv2.HoughLinesP(
+        #             wide_edges, rho=1, theta=np.pi / 180,
+        #             # Stricter: threshold 8->12, minLen 12->18, maxGap 5->3
+        #             threshold=12, minLineLength=18, maxLineGap=3
+        #         )
+        #         angled_lines = 0
+        #         if wide_lines is not None:
+        #             for line in wide_lines:
+        #                 x1, y1, x2, y2 = line[0]
+        #                 length = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+        #                 if length > 20:  # Raised from 15
+        #                     dx = abs(x2 - x1)
+        #                     dy = abs(y2 - y1)
+        #                     # Angled line (not purely H or V)
+        #                     if dx > 5 and dy > 5:  # Raised from 3
+        #                         angled_lines += 1
 
-                if angled_lines >= 3:  # Raised from 2
-                    count += 1
-                    logger.debug(
-                        f"{side} eye - angled temple lines: {angled_lines} (PASS)")
-                else:
-                    logger.debug(
-                        f"{side} eye - angled temple lines: {angled_lines}")
+        #         if angled_lines >= 3:  # Raised from 2
+        #             count += 1
+        #             logger.debug(
+        #                 f"{side} eye - angled temple lines: {angled_lines} (PASS)")
+        #         else:
+        #             logger.debug(
+        #                 f"{side} eye - angled temple lines: {angled_lines}")
 
-            if side == 'left':
-                left_indicators = count
-            else:
-                right_indicators = count
+        #     if side == 'left':
+        #         left_indicators = count
+        #     else:
+        #         right_indicators = count
 
-        # --- Nose bridge check ---
-        if nose_roi.size > 0:
-            nose_blurred = cv2.GaussianBlur(nose_roi, (3, 3), 0)
-            # Raised from (30, 100)
-            nose_edges = cv2.Canny(nose_blurred, 50, 150)
-            nose_edge_density = np.sum(
-                nose_edges > 0) / max(nose_edges.size, 1)
+        # # --- Nose bridge check ---
+        # if nose_roi.size > 0:
+        #     nose_blurred = cv2.GaussianBlur(nose_roi, (3, 3), 0)
+        #     # Raised from (30, 100)
+        #     nose_edges = cv2.Canny(nose_blurred, 50, 150)
+        #     nose_edge_density = np.sum(
+        #         nose_edges > 0) / max(nose_edges.size, 1)
 
-            if nose_edge_density > 0.15:  # Raised from 0.08
-                nose_bridge_indicator = True
-                logger.debug(
-                    f"Nose bridge - edge density: {nose_edge_density:.4f} (PASS)")
-            else:
-                logger.debug(
-                    f"Nose bridge - edge density: {nose_edge_density:.4f}")
+        #     if nose_edge_density > 0.15:  # Raised from 0.08
+        #         nose_bridge_indicator = True
+        #         logger.debug(
+        #             f"Nose bridge - edge density: {nose_edge_density:.4f} (PASS)")
+        #     else:
+        #         logger.debug(
+        #             f"Nose bridge - edge density: {nose_edge_density:.4f}")
 
-        logger.info(
-            f"Glasses indicators - Left: {left_indicators}/6,"
-            f" Right: {right_indicators}/6, Nose: {nose_bridge_indicator}")
+        # logger.info(
+        #     f"Glasses indicators - Left: {left_indicators}/6,"
+        #     f" Right: {right_indicators}/6, Nose: {nose_bridge_indicator}")
 
-        # Detection logic - STRICTER to reduce false positives:
-        # 1. Both eyes need 3+ indicators (was 2)
-        # 2. One eye has 4+ and nose bridge detected (was 3)
-        # 3. Combined indicators >= 7 (was 5)
-        has_glasses = (
-            (left_indicators >= 3 and right_indicators >= 3)
-            or ((left_indicators >= 4 or right_indicators >= 4) and nose_bridge_indicator)
-            or (left_indicators + right_indicators >= 7)
-        )
+        # # Detection logic - STRICTER to reduce false positives:
+        # # 1. Both eyes need 3+ indicators (was 2)
+        # # 2. One eye has 4+ and nose bridge detected (was 3)
+        # # 3. Combined indicators >= 7 (was 5)
+        # has_glasses = (
+        #     (left_indicators >= 3 and right_indicators >= 3)
+        #     or ((left_indicators >= 4 or right_indicators >= 4) and nose_bridge_indicator)
+        #     or (left_indicators + right_indicators >= 7)
+        # )
 
-        return has_glasses
+        # return has_glasses
     # def check_for_glasses(self, face_landmarks):
     #     eye_inds = [33, 133, 157, 158, 159, 160, 161, 246, 7, 163, 144, 145, 153, 154, 155,
     #                 362, 263, 384, 385, 386, 387, 388, 466, 249, 390, 373, 374, 380, 381, 382]

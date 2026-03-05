@@ -27,7 +27,6 @@ async def predict_spoof(upload_file: bytes) -> dict:
                                 spoof based on model threshold and confidence scores
                                 or live_confidence is not above 0.90.
             - 'live_confidence' (float): The confidence score for the image being live.
-            - 'spoof_confidence' (float): The confidence score for the image being a spoof.
     """
 
     try:
