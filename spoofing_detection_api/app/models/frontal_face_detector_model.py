@@ -79,16 +79,9 @@ class ProperFaceDetector:
         h_val = max(0, y_max - y_val)
 
         right_eye_points, left_eye_points = self.get_eye_points(landmarks)
-        jaw_open = blendshapes.get('jawOpen', 0.0)
-
-        upper_lip = blendshapes.get('mouthUpperUpLeft', 0.0) + \
-            blendshapes.get('mouthUpperUpRight', 0.0)
-        lower_lip = blendshapes.get('mouthLowerDownLeft', 0.0) + \
-            blendshapes.get('mouthLowerDownRight', 0.0)
 
         # If any of these show significant movement, the mouth is likely open
-        is_mouth_detected = (jaw_open > 0.10) or (
-            upper_lip > 0.2) or (lower_lip > 0.2)
+        is_mouth_detected = self.is_mouth_detected(face_landmarks)
 
         # left_visible, right_visible = self.is_eyes_visible(
         #     img_bgr, left_eye_points, right_eye_points)
@@ -111,6 +104,16 @@ class ProperFaceDetector:
             'is_eyes_open': is_eyes_open
         })
         return extracted_data
+
+    def is_mouth_detected(self, face_landmarks) -> bool:
+        mouth_indices = [13, 14, 78, 308]
+        is_mouth_detected = True
+        for idx in mouth_indices:
+            lm = face_landmarks[idx]
+            if lm.x < 0.0 or lm.x > 1.0 or lm.y < 0.0 or lm.y > 1.0:
+                is_mouth_detected = False
+                break
+        return is_mouth_detected
 
     def get_eye_points(self, landmarks):
         right_eye_idx = [33, 160, 158, 133, 153, 144]

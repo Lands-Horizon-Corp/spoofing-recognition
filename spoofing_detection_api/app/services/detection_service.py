@@ -44,8 +44,8 @@ async def predict_spoof(upload_file: bytes) -> dict:
     face = faces[0]
     left, top, right, bottom = face['bbox']
     print(f"bbox: {face['bbox']}, image size: {image.size}")
+    extracted_data = frontal_classifier.detect_proper_face_pipeline(image)
     face_image = image.crop((left, top, right, bottom))
-    extracted_data = frontal_classifier.detect_proper_face_pipeline(face_image)
     print(f"Cropped face image size: {face_image.size}")
 
     if not extracted_data:
