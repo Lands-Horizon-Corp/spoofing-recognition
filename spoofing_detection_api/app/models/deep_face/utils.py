@@ -132,7 +132,7 @@ class FaceAnalysis:
             for i, label in enumerate(labels):
                 print(f"{label}: {output[0][0][i]:.4f}")
 
-            return labels[np.argmax(output)]
+            return labels[np.argmax(output[0][0])]
         elif self.model_name == 'age':
             output_indexes = np.array(list(range(0, 101)))
             apparent_age = np.sum(output * output_indexes)

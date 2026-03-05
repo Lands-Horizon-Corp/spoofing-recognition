@@ -46,6 +46,7 @@ async def predict_spoof(upload_file: bytes) -> dict:
     print(f"bbox: {face['bbox']}, image size: {image.size}")
     extracted_data = frontal_classifier.detect_proper_face_pipeline(image)
     face_image = image.crop((left, top, right, bottom))
+
     print(f"Cropped face image size: {face_image.size}")
 
     if not extracted_data:
@@ -74,7 +75,6 @@ async def predict_spoof(upload_file: bytes) -> dict:
     if emotion != 'neutral':
         raise ValueError(
             'ERR_EMOTION_NOT_NEUTRAL')
-
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
     face_image = np.array(face_image)
