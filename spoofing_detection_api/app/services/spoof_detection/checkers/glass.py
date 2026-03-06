@@ -9,15 +9,12 @@ from PIL import Image
 
 class GlassDetectorModel:
     def __init__(self,):
-        self.is_model_loaded = False
         self.model = None
 
     def load_model(self):
-        if not self.is_model_loaded:
-            # Load the ONNX model here
+        if self.model is None:
             self.model = onnxruntime.InferenceSession(
                 settings.GLASS_DETECTOR_MODEL_PATH)
-            self.is_model_loaded = True
 
     def predict(self, img: Image.Image) -> bool:
         self.load_model()
@@ -37,9 +34,6 @@ class GlassDetectorModel:
     def preprocess(self, image: Image.Image) -> np.ndarray:
         img = image.resize((256, 256))
         img = np.array(img).astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406])
-        std = np.array([0.229, 0.224, 0.225])
-        img = (img - mean) / std
         img = np.transpose(img, (2, 0, 1))
         img = np.expand_dims(img, axis=0)
         return img
