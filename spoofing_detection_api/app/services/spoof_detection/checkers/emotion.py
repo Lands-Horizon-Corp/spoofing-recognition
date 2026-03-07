@@ -7,16 +7,14 @@ from PIL.Image import Image
 
 class EmotionChecker:
     def __init__(self):
-        pass
+        self.model = None
 
     def load_model(self):
-        try:
+        if self.model is None:
             self.model = FaceAnalysis(model_name='emotion')
-        except Exception as e:
-            print(f"Error loading emotion detection model: {e}")
-            self.model = None
 
     def detect(self, image: Image) -> str | int | None:
+        self.load_model()
         try:
             img_array = np.array(image)
             assert self.model is not None, 'Emotion detection model is not loaded'

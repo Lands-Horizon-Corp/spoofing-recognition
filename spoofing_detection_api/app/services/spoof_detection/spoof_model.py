@@ -9,19 +9,7 @@ from spoofdet.verify_memory import print_memory_usage
 
 
 class SpoofDetector:
-    _instance = None
-    _initialized = False
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(self):
-        if self._initialized:
-            return
-        self.config = model_config
-        self._initialized = True
         self.model = None
         print_memory_usage('SpoofDetector Initialized')
 
@@ -44,10 +32,12 @@ class SpoofDetector:
         spoof_confidence = np.array(outputs[0]).item()
         spoof_confidence = calculate_sigmoid(spoof_confidence)
         prediction = (spoof_confidence >
-                      self.config.THRESHOLD).astype(np.int32)
+                      model_config.THRESHOLD).astype(np.int32)
         return prediction, spoof_confidence
 
     def _preprocess_img(self, img_np: np.ndarray) -> np.ndarray:
+        assert img_np.dtype == np.uint8, f'Image dtype must be uint8 {
+            img_np.dtype}'
         img_np = img_np.astype(np.float32) / 255.0
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
@@ -57,7 +47,6 @@ class SpoofDetector:
         # (C, H, W) -> (1, C, H, W)
         img_np = np.expand_dims(img_np, axis=0)
 
-        assert img_np.dtype == np.uint8, 'Image dtype must be uint8'
         assert (
             img_np.ndim == 4
         ), 'image must have 4 dimensions: \n'
@@ -73,5 +62,5 @@ if __name__ == '__main__':
 
     print('Model loaded successfully.')
     print(
-        f"threshold: {detector.config.THRESHOLD}"
-        f" target_size: {detector.config.TARGET_SIZE}")
+        f"threshold: {model_config.THRESHOLD}"
+        f" target_size: {model_config.TARGET_SIZE}")

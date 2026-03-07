@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+
 import filetype
 from app.core.constants.http_status import HTTPStatus
 from app.core.constants.http_status import SpoofVerboseHTTPStatus
 from app.core.middleware import header_builder
 from app.core.middleware import resolve_origin
-from app.services.detection_service import predict_spoof
+from app.schemas.detection import DetectionResult
+from app.services.spoof_detection.detect import detect_spoof_service
 from robyn import Request
 from robyn import Response
 from robyn import SubRouter
@@ -50,7 +53,7 @@ async def detect_spoof(request: Request):
     allowed_origin = resolve_origin(origin)
     headers = header_builder(allowed_origin, cors_req)
     img = get_image(request)
-    if not img:
+    if img is None:
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
             headers=headers,
@@ -58,7 +61,8 @@ async def detect_spoof(request: Request):
         )
 
     try:
-        result = await predict_spoof(img)
+        result: DetectionResult = await asyncio.to_thread(detect_spoof_service, img)
+
     except ValueError as e:
         print_memory_usage('Error during prediction')
         return Response(
@@ -66,7 +70,7 @@ async def detect_spoof(request: Request):
             headers=headers,
             description=f'{{"code": "{str(e)}"}}'
         )
-    if result['is_spoof']:
+    if result.is_spoof:
         print_memory_usage('Spoof detected')
         return Response(
             status_code=HTTPStatus.UNAUTHORIZED.value,
@@ -100,7 +104,7 @@ async def detect_spoof_verbose(request: Request):
         )
 
     try:
-        result = await predict_spoof(img)
+        result = await asyncio.to_thread(detect_spoof_service, img)
     except ValueError as e:
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
@@ -108,7 +112,7 @@ async def detect_spoof_verbose(request: Request):
             description=f'{{"code": "{str(e)}"}}'
         )
 
-    if result['is_spoof']:
+    if result.is_spoof:
         return Response(
             status_code=SpoofVerboseHTTPStatus.SPOOF_DETECTED.value,
             headers=headers,

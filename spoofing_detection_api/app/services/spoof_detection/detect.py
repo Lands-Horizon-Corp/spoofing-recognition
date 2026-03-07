@@ -15,7 +15,7 @@ from app.services.spoof_detection.spoof_model import spoof_detector
 from PIL import Image
 
 
-def detect_spoof(uploaded_file: bytes) -> DetectionResult:
+def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     image = open_image(uploaded_file)
     faces = face_detector.find_faces(image)
 
