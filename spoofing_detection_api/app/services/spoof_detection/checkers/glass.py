@@ -20,13 +20,15 @@ class GlassChecker:
         self.load_model()
         assert self.model is not None, 'Model is not loaded.'
         img_array = self.preprocess(img)
-        outputs = self.model.run(None, {'input': img_array})
-        print(f"Raw model output: {outputs}")
+        input = {self.model.get_inputs()[0].name: img_array}
+        outputs = self.model.run(None, input)
         logit = np.array(outputs[0]).flatten()[
             0]  # Extract single scalar value
+
         confidence = calculate_sigmoid(logit)
-        result = confidence > 0.4
+        result = bool(logit > 0)
         print(
+            f"glass logits: {logit}",
             f"Glass detection result: {result}",
             f"confidence: {confidence}")
         return result

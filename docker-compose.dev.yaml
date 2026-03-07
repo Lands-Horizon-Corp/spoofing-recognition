@@ -18,7 +18,5 @@ services:
         "-m",
         "robyn",
         "spoofing_detection_api/app/main.py",
-        "--dev",
-        "--log-level",
-        "DEBUG",
+        "--dev"
       ]

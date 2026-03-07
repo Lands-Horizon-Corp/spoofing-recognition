@@ -30,18 +30,26 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     left, top, right, bottom = face['bbox']
     face_image = image.crop((left, top, right, bottom))
 
-    have_glasses = glass_checker.detect_glasses(face_image)
-    if have_glasses:
-        raise ValueError(
-            'ERR_GLASSES_DETECTED')
-    is_covered = covered_checker.detect_covered(face_image)
-    if is_covered:
-        raise ValueError(
-            'ERR_FACE_COVERED')
     is_facing_forward = face_direction_checker.is_facing_forward(face_image)
     if not is_facing_forward:
         raise ValueError(
             'ERR_FACE_NOT_FRONTAL')
+
+    have_glasses = glass_checker.detect_glasses(image)
+    if have_glasses:
+        raise ValueError(
+            'ERR_GLASSES_DETECTED')
+    _,  blendshapes, face_landmarks,  = covered_checker.extract_landmarks(
+        face_image)
+    is_eye_covered = covered_checker.is_eyes_covered(blendshapes)
+    if is_eye_covered:
+        raise ValueError(
+            'ERR_EYES_CLOSED')
+    is_mouth_covered = covered_checker.is_mouth_covered(face_landmarks)
+    if is_mouth_covered:
+        raise ValueError(
+            'ERR_MOUTH_NOT_DETECTED')
+
     emotion = emotion_checker.detect(face_image)
     if emotion is None:
         raise ValueError(
@@ -61,6 +69,8 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
 def open_image(upload_file: bytes) -> Image.Image:
     try:
         image = Image.open(io.BytesIO(upload_file)).convert('RGB')
+        # Save the image for debugging purposes
+        # image.save("./spoofing_detection_api/debug_image.jpg")
     except Exception as e:
         raise ValueError(
             f"Invalid image file, file type detected:"
