@@ -5,7 +5,7 @@ from app.models.deep_face.utils import FaceAnalysis
 from PIL.Image import Image
 
 
-class EmotionDetection:
+class EmotionChecker:
     def __init__(self):
         pass
 
@@ -27,4 +27,4 @@ class EmotionDetection:
             return None
 
 
-emotion_detector = EmotionDetection()
+emotion_checker = EmotionChecker()

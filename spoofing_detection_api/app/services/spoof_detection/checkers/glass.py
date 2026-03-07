@@ -7,7 +7,7 @@ from app.core.utils import calculate_sigmoid
 from PIL import Image
 
 
-class GlassDetectorModel:
+class GlassChecker:
     def __init__(self,):
         self.model = None
 
@@ -16,7 +16,7 @@ class GlassDetectorModel:
             self.model = onnxruntime.InferenceSession(
                 settings.GLASS_DETECTOR_MODEL_PATH)
 
-    def predict(self, img: Image.Image) -> bool:
+    def detect_glasses(self, img: Image.Image) -> bool:
         self.load_model()
         assert self.model is not None, 'Model is not loaded.'
         img_array = self.preprocess(img)
@@ -42,4 +42,4 @@ class GlassDetectorModel:
         return img
 
 
-glass_detector = GlassDetectorModel()
+glass_checker = GlassChecker()

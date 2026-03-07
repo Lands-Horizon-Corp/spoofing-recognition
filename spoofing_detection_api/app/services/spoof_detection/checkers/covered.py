@@ -90,3 +90,6 @@ class CoveredChecker:
                 blendshapes[category.category_name] = category.score
 
         return np.array(pixel_points), blendshapes, face_landmarks
+
+
+covered_checker = CoveredChecker()
