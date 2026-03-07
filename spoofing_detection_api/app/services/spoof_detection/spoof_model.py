@@ -36,8 +36,7 @@ class SpoofDetector:
         return prediction, spoof_confidence
 
     def _preprocess_img(self, img_np: np.ndarray) -> np.ndarray:
-        assert img_np.dtype == np.uint8, f'Image dtype must be uint8 {
-            img_np.dtype}'
+        assert img_np.dtype == np.uint8, f'Image dtype must be uint8 {img_np.dtype}'  # noqa: E501
         img_np = img_np.astype(np.float32) / 255.0
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
