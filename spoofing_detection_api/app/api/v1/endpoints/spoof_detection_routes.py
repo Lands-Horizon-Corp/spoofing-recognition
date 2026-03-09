@@ -36,6 +36,7 @@ def get_image(request: Request) -> bytes | None:
     first_key = file_names[0]
     if not is_image_file(files[first_key]):
         return None
+    print(f"Received file: {first_key}, size: {len(files[first_key])} bytes")
     return files[first_key]
 
 
@@ -61,15 +62,17 @@ async def detect_spoof(request: Request):
         )
 
     try:
-        result: DetectionResult = await asyncio.to_thread(detect_spoof_service, img)
+        result: DetectionResult = detect_spoof_service(img)
 
     except ValueError as e:
         print_memory_usage('Error during prediction')
+        print(f"Error: {str(e)}")
         return Response(
             status_code=HTTPStatus.BAD_REQUEST.value,
             headers=headers,
             description=f'{{"code": "{str(e)}"}}'
         )
+
     if result.is_spoof:
         print_memory_usage('Spoof detected')
         return Response(

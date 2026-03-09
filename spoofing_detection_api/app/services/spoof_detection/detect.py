@@ -39,12 +39,14 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     if have_glasses:
         raise ValueError(
             'ERR_GLASSES_DETECTED')
+
     _,  blendshapes, face_landmarks,  = covered_checker.extract_landmarks(
         face_image)
     is_eye_covered = covered_checker.is_eyes_covered(blendshapes)
     if is_eye_covered:
         raise ValueError(
             'ERR_EYES_CLOSED')
+
     is_mouth_covered = covered_checker.is_mouth_covered(face_landmarks)
     if is_mouth_covered:
         raise ValueError(
@@ -60,6 +62,16 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     face_image = np.array(face_image)
     prediction, spoof_confidence = spoof_detector.predict(face_image)
 
+    print(
+        f"Emotion: {emotion}\n",
+        f"Face direction frontal: {is_facing_forward}\n",
+        f"Glasses detected: {have_glasses}\n",
+        f"Eyes covered: {is_eye_covered}\n",
+        f"Mouth covered: {is_mouth_covered}\n",
+        f"Spoof prediction: {prediction}\n",
+        f"Spoof confidence: {spoof_confidence}"
+    )
+
     return DetectionResult(
         is_spoof=prediction,
         spoof_confidence=spoof_confidence
@@ -70,7 +82,7 @@ def open_image(upload_file: bytes) -> Image.Image:
     try:
         image = Image.open(io.BytesIO(upload_file)).convert('RGB')
         # Save the image for debugging purposes
-        # image.save("./spoofing_detection_api/debug_image.jpg")
+        image.save('./spoofing_detection_api/debug_image.jpg')
     except Exception as e:
         raise ValueError(
             f"Invalid image file, file type detected:"

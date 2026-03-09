@@ -46,14 +46,16 @@ class CoveredChecker:
         return is_eyes_covered
 
     def is_mouth_covered(self, face_landmarks) -> bool:
+        if not face_landmarks:
+            return True  # no landmarks detected — face/mouth not visible
         mouth_indices = [13, 14, 78, 308]
-        is_mouth_covered = False
         for idx in mouth_indices:
             lm = face_landmarks[idx]
-            if lm.x < 0.0 or lm.x > 1.0 or lm.y < 0.0 or lm.y > 1.0:
-                is_mouth_covered = True
-                break
-        return is_mouth_covered
+            # FaceLandmarker normalizes to [0,1], but landmarks near the edge
+            # of a cropped face image can still fall slightly outside bounds
+            if lm.x < 0.02 or lm.x > 0.98 or lm.y < 0.02 or lm.y > 0.98:
+                return True
+        return False
 
     def detect_covered(self, image: Image.Image) -> bool:
 
@@ -73,7 +75,7 @@ class CoveredChecker:
         assert self.face_mesh_detector is not None, 'Face mesh detector model is not loaded'
         detection_result = self.face_mesh_detector.detect(mp_image)
         if not detection_result.face_landmarks:
-            return np.array([]), {}, detection_result
+            return np.array([]), {}, []
 
         h, w, _ = img_rgb.shape
         face_landmarks = detection_result.face_landmarks[0]

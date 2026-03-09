@@ -31,8 +31,8 @@ class SpoofDetector:
         outputs = self.model.run(None, ort_inputs)
         spoof_confidence = np.array(outputs[0]).item()
         spoof_confidence = calculate_sigmoid(spoof_confidence)
-        prediction = (spoof_confidence >
-                      model_config.THRESHOLD).astype(np.int32)
+        prediction = bool(spoof_confidence >
+                          model_config.THRESHOLD)
         return prediction, spoof_confidence
 
     def _preprocess_img(self, img_np: np.ndarray) -> np.ndarray:
