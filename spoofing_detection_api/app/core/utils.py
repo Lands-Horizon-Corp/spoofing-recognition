@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 from typing import TypeAlias
 
@@ -36,8 +37,14 @@ TBlendshapes: TypeAlias = dict[str, float]
 
 TFaceLandmarks: TypeAlias = list[Any]
 
+TPose: TypeAlias = dict[str, float]
+
 
 class MediaPipeUtils:
+    """
+    should pass the whole image not the cropped face image.
+    """
+
     def __init__(self):
         self.face_mesh_detector = None
 
@@ -52,35 +59,63 @@ class MediaPipeUtils:
                 num_faces=1,
                 min_face_detection_confidence=0.5,
                 min_face_presence_confidence=0.5,
-                output_face_blendshapes=True
+                output_face_blendshapes=True,
+                output_facial_transformation_matrixes=True,
             )
             self.face_mesh_detector = vision.FaceLandmarker.create_from_options(
                 options)
 
-    def extract_landmarks(self, image: Image.Image) -> tuple[np.ndarray, TBlendshapes, TFaceLandmarks]:  # noqa: E501
+    def get_head_pose(self, transformation_matrix: np.ndarray) -> tuple[float, float, float]:
+        rmat = transformation_matrix[:3, :3]
+        sy = math.sqrt(rmat[0, 0] * rmat[0, 0] + rmat[1, 0] * rmat[1, 0])
+        singular = sy < 1e-6
+
+        if not singular:
+            pitch = math.atan2(rmat[2, 1], rmat[2, 2])
+            yaw = math.atan2(-rmat[2, 0], sy)
+            roll = math.atan2(rmat[1, 0], rmat[0, 0])
+        else:
+            pitch = math.atan2(-rmat[1, 2], rmat[1, 1])
+            yaw = math.atan2(-rmat[2, 0], sy)
+            roll = 0
+
+        return math.degrees(pitch), math.degrees(yaw), math.degrees(roll)
+
+    def extract_landmarks(self, image: Image.Image) -> tuple[np.ndarray, TBlendshapes, TFaceLandmarks, TPose]:  # noqa: E501
         img_rgb = np.array(image.convert('RGB'))
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+
         self.load_model()
         assert self.face_mesh_detector is not None, 'Face mesh detector model is not loaded'
+
         detection_result = self.face_mesh_detector.detect(mp_image)
         if not detection_result.face_landmarks:
             raise ValueError(DetectionError.NO_FACE.value)
 
         h, w, _ = img_rgb.shape
         face_landmarks = detection_result.face_landmarks[0]
-
-        pixel_points = []
-        for landmark in face_landmarks:
-            x = int(landmark.x * w)
-            y = int(landmark.y * h)
-            pixel_points.append([x, y])
+        pixel_points = [[int(landmark.x * w), int(landmark.y * h)]
+                        for landmark in face_landmarks]
 
         blendshapes: TBlendshapes = {}
         if detection_result.face_blendshapes:
             for category in detection_result.face_blendshapes[0]:
                 blendshapes[category.category_name] = category.score
+        sample_landmark = face_landmarks[0]
 
-        return np.array(pixel_points), blendshapes, face_landmarks
+        print('visibility attribute exists:', hasattr(
+            sample_landmark, 'visibility'), sample_landmark.visibility)
+
+        print(dir(sample_landmark))
+        print('visibility:', sample_landmark.visibility)
+        print('presence:', getattr(sample_landmark, 'presence', None))
+        pose: TPose = {}
+        if detection_result.facial_transformation_matrixes:
+            matrix = detection_result.facial_transformation_matrixes[0]
+            pitch, yaw, roll = self.get_head_pose(matrix)
+            pose = {'pitch': pitch, 'yaw': yaw, 'roll': roll}
+
+        return np.array(pixel_points), blendshapes, face_landmarks, pose
 
     def close(self):
         if self.face_mesh_detector is not None:

@@ -11,8 +11,8 @@ from app.services.spoof_detection.checkers.covered import is_eyes_covered
 from app.services.spoof_detection.checkers.covered import is_mouth_closed
 from app.services.spoof_detection.checkers.covered import is_mouth_covered
 from app.services.spoof_detection.checkers.emotion import emotion_checker
-from app.services.spoof_detection.checkers.face_direction import \
-    face_direction_checker
+from app.services.spoof_detection.checkers.face_direction import check_face_direction
+from app.services.spoof_detection.checkers.face_direction import FaceDirectionEnum
 from app.services.spoof_detection.checkers.glass import glass_checker
 from app.services.spoof_detection.checkers.single_face import face_detector
 from app.services.spoof_detection.spoof_model import spoof_detector
@@ -34,7 +34,9 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     left, top, right, bottom = face['bbox']
     face_image = image.crop((left, top, right, bottom))
 
-    is_facing_forward = face_direction_checker.is_facing_forward(face_image)
+    pixel_points, blendshapes, face_landmarks, pose = mp_utils.extract_landmarks(
+        image)
+    is_facing_forward = check_face_direction(pose) == FaceDirectionEnum.FRONTAL
     if not is_facing_forward:
         raise ValueError(
             DetectionError.NOT_FRONTAL.value)
@@ -44,9 +46,7 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
         raise ValueError(
             DetectionError.GLASSES_DETECTED.value)
 
-    _,  blendshapes, face_landmarks,  = mp_utils.extract_landmarks(
-        image)
-    is_eyes_covered_check = is_eyes_covered(blendshapes)
+    is_eyes_covered_check = is_eyes_covered(blendshapes, pixel_points)
     if is_eyes_covered_check:
         raise ValueError(
             DetectionError.EYES_CLOSED.value)
@@ -54,7 +54,7 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     if is_mouth_covered_check:
         raise ValueError(
             DetectionError.MOUTH_NOT_DETECTED.value)
-    is_mouth_closed_check = is_mouth_closed(blendshapes)
+    is_mouth_closed_check = is_mouth_closed(blendshapes, pixel_points)
     if not is_mouth_closed_check:
         raise ValueError(
             DetectionError.MOUTH_OPEN.value)
