@@ -4,6 +4,7 @@ import io
 
 import numpy as np
 from app.core.config import model_config
+from app.core.constants.spoof_errors import DetectionError
 from app.schemas.detection import DetectionResult
 from app.services.spoof_detection.checkers.covered import covered_checker
 from app.services.spoof_detection.checkers.emotion import emotion_checker
@@ -21,10 +22,10 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
 
     if not faces:
         raise ValueError(
-            'ERR_NO_FACE')
+            DetectionError.NO_FACE.value)
     if len(faces) > 1:
         raise ValueError(
-            'ERR_MULTIPLE_FACES')
+            DetectionError.MULTIPLE_FACES.value)
 
     face = faces[0]
     left, top, right, bottom = face['bbox']
@@ -33,29 +34,28 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     is_facing_forward = face_direction_checker.is_facing_forward(face_image)
     if not is_facing_forward:
         raise ValueError(
-            'ERR_FACE_NOT_FRONTAL')
+            DetectionError.NOT_FRONTAL.value)
 
     have_glasses = glass_checker.detect_glasses(image)
     if have_glasses:
         raise ValueError(
-            'ERR_GLASSES_DETECTED')
-
+            DetectionError.GLASSES_DETECTED.value)
     _,  blendshapes, face_landmarks,  = covered_checker.extract_landmarks(
         face_image)
     is_eye_covered = covered_checker.is_eyes_covered(blendshapes)
     if is_eye_covered:
         raise ValueError(
-            'ERR_EYES_CLOSED')
+            DetectionError.EYES_CLOSED.value)
 
     is_mouth_covered = covered_checker.is_mouth_covered(face_landmarks)
     if is_mouth_covered:
         raise ValueError(
-            'ERR_MOUTH_NOT_DETECTED')
+            DetectionError.MOUTH_NOT_DETECTED.value)
 
     emotion = emotion_checker.detect(face_image)
     if emotion is None:
         raise ValueError(
-            'ERR_EMOTION_DETECTION_FAILED')
+            DetectionError.EMOTION_DETECTION_FAILED.value)
 
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))

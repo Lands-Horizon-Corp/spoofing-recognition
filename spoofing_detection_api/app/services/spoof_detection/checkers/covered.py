@@ -6,6 +6,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from app.core.config import settings
+from app.core.constants.spoof_errors import DetectionError
 from cv2 import data
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -61,7 +62,7 @@ class CoveredChecker:
 
         _, blendshapes, face_landmarks = self.extract_landmarks(image)
         if not blendshapes or not face_landmarks:
-            return False
+            raise ValueError(DetectionError.NO_FACE.value)
 
         eyes_covered = self.is_eyes_covered(blendshapes)
         mouth_covered = self.is_mouth_covered(face_landmarks)
@@ -75,7 +76,7 @@ class CoveredChecker:
         assert self.face_mesh_detector is not None, 'Face mesh detector model is not loaded'
         detection_result = self.face_mesh_detector.detect(mp_image)
         if not detection_result.face_landmarks:
-            return np.array([]), {}, []
+            raise ValueError(DetectionError.NO_FACE.value)
 
         h, w, _ = img_rgb.shape
         face_landmarks = detection_result.face_landmarks[0]
