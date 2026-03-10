@@ -5,8 +5,11 @@ import io
 import numpy as np
 from app.core.config import model_config
 from app.core.constants.spoof_errors import DetectionError
+from app.core.utils import mp_utils
 from app.schemas.detection import DetectionResult
-from app.services.spoof_detection.checkers.covered import covered_checker
+from app.services.spoof_detection.checkers.covered import is_eyes_covered
+from app.services.spoof_detection.checkers.covered import is_mouth_closed
+from app.services.spoof_detection.checkers.covered import is_mouth_covered
 from app.services.spoof_detection.checkers.emotion import emotion_checker
 from app.services.spoof_detection.checkers.face_direction import \
     face_direction_checker
@@ -40,17 +43,21 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     if have_glasses:
         raise ValueError(
             DetectionError.GLASSES_DETECTED.value)
-    _,  blendshapes, face_landmarks,  = covered_checker.extract_landmarks(
-        face_image)
-    is_eye_covered = covered_checker.is_eyes_covered(blendshapes)
-    if is_eye_covered:
+
+    _,  blendshapes, face_landmarks,  = mp_utils.extract_landmarks(
+        image)
+    is_eyes_covered_check = is_eyes_covered(blendshapes)
+    if is_eyes_covered_check:
         raise ValueError(
             DetectionError.EYES_CLOSED.value)
-
-    is_mouth_covered = covered_checker.is_mouth_covered(face_landmarks)
-    if is_mouth_covered:
+    is_mouth_covered_check = is_mouth_covered(face_landmarks)
+    if is_mouth_covered_check:
         raise ValueError(
             DetectionError.MOUTH_NOT_DETECTED.value)
+    is_mouth_closed_check = is_mouth_closed(blendshapes)
+    if not is_mouth_closed_check:
+        raise ValueError(
+            DetectionError.MOUTH_OPEN.value)
 
     emotion = emotion_checker.detect(face_image)
     if emotion is None:
@@ -66,8 +73,9 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
         f"Emotion: {emotion}\n",
         f"Face direction frontal: {is_facing_forward}\n",
         f"Glasses detected: {have_glasses}\n",
-        f"Eyes covered: {is_eye_covered}\n",
-        f"Mouth covered: {is_mouth_covered}\n",
+        f"Eyes covered: {is_eyes_covered_check}\n",
+        f"Mouth covered: {is_mouth_covered_check}\n",
+        f"Mouth closed: {is_mouth_closed_check}\n",
         f"Spoof prediction: {prediction}\n",
         f"Spoof confidence: {spoof_confidence}"
     )

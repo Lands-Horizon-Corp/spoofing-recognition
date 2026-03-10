@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import TypeAlias
 
 import mediapipe as mp
 import numpy as np
@@ -31,6 +32,11 @@ def calculate_sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
+TBlendshapes: TypeAlias = dict[str, float]
+
+TFaceLandmarks: TypeAlias = list[Any]
+
+
 class MediaPipeUtils:
     def __init__(self):
         self.face_mesh_detector = None
@@ -51,7 +57,7 @@ class MediaPipeUtils:
             self.face_mesh_detector = vision.FaceLandmarker.create_from_options(
                 options)
 
-    def extract_landmarks(self, image: Image.Image) -> tuple[np.ndarray, dict[str, float],  list[Any]]:  # noqa: E501
+    def extract_landmarks(self, image: Image.Image) -> tuple[np.ndarray, TBlendshapes, TFaceLandmarks]:  # noqa: E501
         img_rgb = np.array(image.convert('RGB'))
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
         self.load_model()
@@ -69,7 +75,7 @@ class MediaPipeUtils:
             y = int(landmark.y * h)
             pixel_points.append([x, y])
 
-        blendshapes: dict[str, float] = {}
+        blendshapes: TBlendshapes = {}
         if detection_result.face_blendshapes:
             for category in detection_result.face_blendshapes[0]:
                 blendshapes[category.category_name] = category.score
@@ -80,3 +86,6 @@ class MediaPipeUtils:
         if self.face_mesh_detector is not None:
             self.face_mesh_detector.close()
             self.face_mesh_detector = None
+
+
+mp_utils = MediaPipeUtils()
