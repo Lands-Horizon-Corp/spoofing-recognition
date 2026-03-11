@@ -50,7 +50,8 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     if is_eyes_covered_check:
         raise ValueError(
             DetectionError.EYES_CLOSED.value)
-    is_mouth_covered_check = is_mouth_covered(face_landmarks)
+    is_mouth_covered_check = is_mouth_covered(
+        face_landmarks, blendshapes, pixel_points)
     if is_mouth_covered_check:
         raise ValueError(
             DetectionError.MOUTH_NOT_DETECTED.value)

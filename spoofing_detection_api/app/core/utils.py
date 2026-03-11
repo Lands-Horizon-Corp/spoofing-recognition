@@ -101,14 +101,6 @@ class MediaPipeUtils:
         if detection_result.face_blendshapes:
             for category in detection_result.face_blendshapes[0]:
                 blendshapes[category.category_name] = category.score
-        sample_landmark = face_landmarks[0]
-
-        print('visibility attribute exists:', hasattr(
-            sample_landmark, 'visibility'), sample_landmark.visibility)
-
-        print(dir(sample_landmark))
-        print('visibility:', sample_landmark.visibility)
-        print('presence:', getattr(sample_landmark, 'presence', None))
         pose: TPose = {}
         if detection_result.facial_transformation_matrixes:
             matrix = detection_result.facial_transformation_matrixes[0]
