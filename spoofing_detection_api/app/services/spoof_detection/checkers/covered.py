@@ -122,31 +122,34 @@ def is_eyes_covered(
 
 def is_mouth_covered(
     face_landmarks: TFaceLandmarks,
-    visibility_threshold: float = 0.6,
-    min_visible_points: int = 4
+    min_inbound_points: int = 10,
 ) -> bool:
     """
-    Return True if the mouth appears occluded (covered) based on landmark visibility.
+    Return True if the mouth appears occluded or out-of-frame.
+
+    MediaPipe FaceLandmarker does not populate the ``visibility`` attribute
+    (it is always ``None``).  Instead we rely on whether the normalized (x, y)
+    coordinates of sentinel mouth landmarks fall within the [0, 1] image frame.
+    A landmark that lands outside that range is off-screen, meaning the mouth
+    is at least partially cropped or not reliably detected.
 
     :param face_landmarks: List of NormalizedLandmark from FaceLandmarker.
-    :param visibility_threshold: Minimum visibility score to consider a landmark "visible".
-    :param min_visible_points: Required number of mouth landmarks with visibility >= threshold.
-    :return: True if mouth is likely covered.
+    :param min_inbound_points: Minimum number of mouth landmarks that must be
+        within [0, 1] bounds to consider the mouth visible.
+    :return: True if mouth is likely covered / out of frame.
     """
     if not face_landmarks:
-        return True  # No landmarks – definitely not visible
+        return True  # no landmarks — face/mouth not visible
 
-    # Count how many sentinel landmarks have good visibility
-    visible_count = 0
-    for idx in _MOUTH_SENTINEL_INDICES:  # or a dedicated set
-        lm = face_landmarks[idx]
-        if lm.visibility is not None and lm.visibility >= visibility_threshold:
-            visible_count += 1
-        print(f"Mouth landmark {idx} visibility: {lm.visibility}")
-    print(f"Visible mouth landmarks: {
-          visible_count}/{len(_MOUTH_SENTINEL_INDICES)}")
-    # Mouth is covered if too few landmarks are clearly visible
-    return visible_count < min_visible_points
+    inbound = sum(
+        1
+        for idx in _MOUTH_SENTINEL_INDICES
+        if 0.0 <= face_landmarks[idx].x <= 1.0
+        and 0.0 <= face_landmarks[idx].y <= 1.0
+    )
+    print(
+        f'Mouth visibility check: {inbound} in-bounds points (threshold: {min_inbound_points})')
+    return inbound < min_inbound_points
 
 
 def is_mouth_closed(
