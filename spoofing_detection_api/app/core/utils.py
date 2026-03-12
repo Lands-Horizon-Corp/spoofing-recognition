@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import math
+import os
 from typing import Any
 from typing import TypeAlias
 
+import gdown
 import mediapipe as mp
 import numpy as np
 import requests  # type: ignore
@@ -12,6 +14,21 @@ from app.core.constants.spoof_errors import DetectionError
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from PIL import Image
+
+
+class DownloadFile:
+    def __init__(self, file_url: str, file_path: str):
+        self.file_url = file_url
+        self.file_path = file_path
+
+    async def execute(self):
+        if 'drive.google.com' in self.file_url:
+            gdown.download(self.file_url, self.file_path, quiet=False)
+        else:
+            await download_file(self.file_url, self.file_path)
+
+    def check_file_exists(self) -> bool:
+        return os.path.isfile(self.file_path)
 
 
 async def download_file(file_url: str, file_path: str):
