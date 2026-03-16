@@ -5,7 +5,6 @@ import io
 import numpy as np
 from app.core.config import model_config
 from app.core.constants.spoof_errors import DetectionError
-from app.core.utils import mp_utils
 from app.schemas.detection import DetectionResult
 from app.services.spoof_detection.checkers.covered import is_eyes_covered
 from app.services.spoof_detection.checkers.covered import is_mouth_closed
@@ -15,8 +14,10 @@ from app.services.spoof_detection.checkers.face_direction import check_face_dire
 from app.services.spoof_detection.checkers.face_direction import FaceDirectionEnum
 from app.services.spoof_detection.checkers.glass import glass_checker
 from app.services.spoof_detection.checkers.single_face import face_detector
-from app.services.spoof_detection.spoof_model import spoof_detector
+from app.services.spoof_detection.model_manager import model_manager
 from PIL import Image
+
+spoof_detector, mp_utils = model_manager.get_resources()
 
 
 def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:

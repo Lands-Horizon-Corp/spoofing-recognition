@@ -53,6 +53,12 @@ class SpoofDetector:
         f"{img_np.ndim}"
         return img_np
 
+    def unload_model(self):
+        if self.model is not None:
+            del self.model
+            self.model = None
+            print_memory_usage('Model Unloaded from SpoofDetector')
+
 
 spoof_detector = SpoofDetector()
 
