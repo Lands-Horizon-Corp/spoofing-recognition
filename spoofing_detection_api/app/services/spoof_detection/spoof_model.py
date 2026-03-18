@@ -5,7 +5,7 @@ import onnxruntime as ort
 from app.core.config import model_config
 from app.core.config import settings
 from app.core.utils import calculate_sigmoid
-from spoofdet.verify_memory import print_memory_usage
+from spoofdet.utils.verify_memory import print_memory_usage
 
 
 class SpoofDetector:

@@ -9,7 +9,7 @@ from app.core.security import limiter
 from robyn import Request
 from robyn import Response
 from robyn import Robyn
-from spoofdet.verify_memory import print_memory_usage
+from spoofdet.utils.verify_memory import print_memory_usage
 
 print_memory_usage('Starting up the API...')
 

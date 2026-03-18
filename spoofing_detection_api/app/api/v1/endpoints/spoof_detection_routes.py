@@ -12,7 +12,7 @@ from app.services.spoof_detection.detect import detect_spoof_service
 from robyn import Request
 from robyn import Response
 from robyn import SubRouter
-from spoofdet.verify_memory import print_memory_usage
+from spoofdet.utils.verify_memory import print_memory_usage
 
 router = SubRouter(__file__, prefix='/api/v1/spoof')
 print('Spoof Detection Routes Loaded')
