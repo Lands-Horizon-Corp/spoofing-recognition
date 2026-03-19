@@ -62,7 +62,7 @@ async def detect_spoof(request: Request):
         )
 
     try:
-        result: DetectionResult = detect_spoof_service(img)
+        result: DetectionResult = await asyncio.to_thread(detect_spoof_service, img)
 
     except ValueError as e:
         print_memory_usage('Error during prediction')
