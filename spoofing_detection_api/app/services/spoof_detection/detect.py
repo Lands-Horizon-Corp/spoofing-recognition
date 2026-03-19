@@ -92,7 +92,7 @@ def open_image(upload_file: bytes) -> Image.Image:
     try:
         image = Image.open(io.BytesIO(upload_file)).convert('RGB')
         # Save the image for debugging purposes
-        image.save('./spoofing_detection_api/debug_image.jpg')
+        # image.save('./spoofing_detection_api/debug_image.jpg')
     except Exception as e:
         raise ValueError(
             f"Invalid image file, file type detected:"

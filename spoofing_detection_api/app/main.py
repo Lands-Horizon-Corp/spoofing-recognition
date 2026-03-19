@@ -33,7 +33,7 @@ ALLOWED_METHODS = 'GET, POST, OPTIONS'
 
 @app.startup_handler
 async def run_on_startup():
-    await startup.download_model()
+    await startup.download_models()
     print_memory_usage('Startup Complete')
     print('Starting up the API...')
     print_memory_usage('Startup Tasks Completed')
