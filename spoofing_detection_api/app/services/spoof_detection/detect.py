@@ -17,10 +17,9 @@ from app.services.spoof_detection.checkers.single_face import face_detector
 from app.services.spoof_detection.model_manager import model_manager
 from PIL import Image
 
-spoof_detector, mp_utils = model_manager.get_resources()
-
 
 def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
+    spoof_detector, mp_utils = model_manager.get_resources()
     image = open_image(uploaded_file)
     faces = face_detector.find_faces(image)
 
