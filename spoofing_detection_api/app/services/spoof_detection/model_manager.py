@@ -35,6 +35,7 @@ class ModelManager:
         with self.lock:
             # Update timestamp every time the model is requested
             self.last_accessed_time = time.time()
+
             if self.mp_utils is None:
                 raise ValueError('mp_utils cannot be None')
             if self.spoof_detector is None:
@@ -58,7 +59,6 @@ class ModelManager:
             if self.mp_utils is not None:
                 print('TTL expired: Closing MediaPipe Utils.')
                 self.mp_utils.close()
-                self.mp_utils = None
 
     def _cleanup_loop(self):
         while not self.stop_event.is_set():

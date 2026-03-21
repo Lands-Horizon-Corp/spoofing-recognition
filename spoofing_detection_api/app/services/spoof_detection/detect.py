@@ -9,7 +9,6 @@ from app.schemas.detection import DetectionResult
 from app.services.spoof_detection.checkers.covered import is_eyes_covered
 from app.services.spoof_detection.checkers.covered import is_mouth_closed
 from app.services.spoof_detection.checkers.covered import is_mouth_covered
-from app.services.spoof_detection.checkers.emotion import emotion_checker
 from app.services.spoof_detection.checkers.face_direction import check_face_direction
 from app.services.spoof_detection.checkers.face_direction import FaceDirectionEnum
 from app.services.spoof_detection.checkers.glass import glass_checker
@@ -60,10 +59,10 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
         raise ValueError(
             DetectionError.MOUTH_OPEN.value)
 
-    emotion = emotion_checker.detect(face_image)
-    if emotion is None:
-        raise ValueError(
-            DetectionError.EMOTION_DETECTION_FAILED.value)
+    # emotion = emotion_checker.detect(face_image)
+    # if emotion is None:
+    #     raise ValueError(
+    #         DetectionError.EMOTION_DETECTION_FAILED.value)
 
     face_image = face_image.resize(
         (model_config.TARGET_SIZE, model_config.TARGET_SIZE))
@@ -71,7 +70,6 @@ def detect_spoof_service(uploaded_file: bytes) -> DetectionResult:
     prediction, spoof_confidence = spoof_detector.predict(face_image)
 
     print(
-        f"Emotion: {emotion}\n",
         f"Face direction frontal: {is_facing_forward}\n",
         f"Glasses detected: {have_glasses}\n",
         f"Eyes covered: {is_eyes_covered_check}\n",

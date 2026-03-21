@@ -86,6 +86,7 @@ class Settings(BaseSettings):
     SPOOFING_FACE_DETECTOR_DOWNLOAD_URL_ENV: str = ''
     FACE_LANDMARKS_MODEL_DOWNLOAD_URL_ENV: str = ''
     GLASS_DETECTOR_MODEL_DOWNLOAD_URL_ENV: str = ''
+    PROFILING: bool = False
     THRESHOLD: float = 0.5
     OPENAPI_PATH: str = str(BASE_DIR / 'spoofing_detection_api/openapi.json')
 

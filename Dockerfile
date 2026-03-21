@@ -31,6 +31,7 @@ COPY ./spoofing_detection_api /code/spoofing_detection_api
 # This tells Python: "Look for imports in 'src' AND 'spoofing_detection_api'"
 # This fixes "ModuleNotFoundError: No module named 'app'"
 ENV PYTHONPATH="${PYTHONPATH}:/code/src:/code/spoofing_detection_api"
+ENV PYTHONUNBUFFERED=1
 
 # 6. Run the App
 # We point to the nested main.py file
