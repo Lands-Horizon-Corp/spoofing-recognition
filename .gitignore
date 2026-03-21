@@ -19,3 +19,4 @@ logs
 *.pth
 lbfmodel.yaml
 *.task
+debug_image.jpg
