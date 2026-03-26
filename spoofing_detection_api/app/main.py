@@ -33,6 +33,7 @@ PROFILE_ENABLED_HEADER = 'x-profile-enabled'
 LATEST_PROFILE_PATH = Path('./profile_latest.html')
 
 
+# TODO : move to util file
 def _to_bool(value: object) -> bool:
     if value is None:
         return False
@@ -116,6 +117,8 @@ def intercept_and_limit(req: Request):
 @app.after_request()
 def profile_request(request: Request, response: Response):
     return response
+
+# TODO: separate routes
 
 
 @app.get('/api/v1/profile/dump')
