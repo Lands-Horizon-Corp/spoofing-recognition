@@ -18,8 +18,8 @@ from sklearn.metrics import f1_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import roc_curve
-from spoofdet.data_processing import get_data_for_training
-from spoofdet.dataset import CelebASpoofDataset
+from spoofdet.data_processing.dataset import CelebASpoofDataset
+from spoofdet.data_processing.train_val_split import get_data_for_training
 from torch.utils.data import Subset
 from torchvision import models
 from torchvision.transforms import v2

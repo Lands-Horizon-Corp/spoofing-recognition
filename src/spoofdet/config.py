@@ -12,9 +12,11 @@ BBOX_LOOKUP = BASE_DIR / 'bbox_lookup.json'
 
 REAL_VS_FAKE_PATH = BASE_DIR / 'dataset/archive/real_vs_fake/real-vs-fake'
 
-mean = [0.485, 0.456, 0.406]
-std = [0.229, 0.224, 0.225]
+MEAN = [0.485, 0.456, 0.406]
+STD = [0.229, 0.224, 0.225]
 
+
+MODEL_NAME = 'horizon_fast_net'
 
 BATCH_SIZE = 32
 EPOCHS = 200
