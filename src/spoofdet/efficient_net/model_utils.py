@@ -12,12 +12,10 @@ import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import auc
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
-from sklearn.metrics import roc_curve
 from spoofdet.data_processing.dataset import CelebASpoofDataset
 from spoofdet.data_processing.train_val_split import get_data_for_training
 from torch.utils.data import Subset
@@ -69,125 +67,6 @@ def test_model(model, test_loader, device, threshold):
     plt.xlabel('Predicted label')
     plt.tight_layout()
     plt.show()
-
-
-# Get predictions and labels on full test set
-def calculate_roc_auc(model_quantized, small_test_loader):
-    all_predictions = []
-    all_labels = []
-
-    with torch.no_grad():
-        for img, label in small_test_loader:
-            img = img.to(torch.device)
-
-            outputs = model_quantized(img)
-            predictions = torch.sigmoid(outputs).squeeze().cpu().numpy()
-
-            all_predictions.extend(predictions)
-            all_labels.extend(label.numpy())
-
-    # Calculate ROC curve and AUC
-    fpr, tpr, thresholds = roc_curve(all_labels, all_predictions)
-    roc_auc = auc(fpr, tpr)
-
-    print(f"AUC-ROC Score: {roc_auc:.4f}")
-
-    # Find optimal threshold (Youden's J statistic)
-    optimal_idx = np.argmax(tpr - fpr)
-    optimal_threshold = thresholds[optimal_idx]
-
-    print(f"Optimal Threshold: {optimal_threshold:.4f}")
-
-    # Plot ROC curve
-    plt.figure(figsize=(8, 6))
-    plt.plot(fpr, tpr, color='darkorange', lw=2,
-             label=f'ROC curve (AUC = {roc_auc:.4f})')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2,
-             linestyle='--', label='Random Classifier')
-    plt.scatter(fpr[optimal_idx], tpr[optimal_idx], marker='o', color='red',
-                s=100, label=f'Optimal Threshold = {optimal_threshold:.4f}')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC Curve - Quantized Model')
-    plt.legend(loc='lower right')
-    plt.grid(alpha=0.3)
-    plt.show()
-
-
-def freeze_stages(model: nn.Module, frozen_stages: int):
-    """
-    Freezes the initial layers of the model.
-    Robust to structure (Torchvision vs Timm) and Pylance type checking.
-    """
-
-    # 1. Handle Timm Models (MobileNetV4, etc.)
-    if hasattr(model, 'blocks'):
-        print('Detected Timm model structure.')
-
-        # Freeze Stem (if present)
-        if hasattr(model, 'conv_stem'):
-            for param in cast(nn.Module, model.conv_stem).parameters():
-                param.requires_grad = False
-
-        if hasattr(model, 'bn1'):
-            for param in cast(nn.Module, model.bn1).parameters():
-                param.requires_grad = False
-
-        # Freeze Blocks
-        # We explicitly iterate over children to ensure they are Modules
-        blocks = list(cast(nn.ModuleList, model.blocks).children())
-        limit = min(frozen_stages, len(blocks))
-
-        for i in range(limit):
-            block = blocks[i]
-            # SAFETY CHECK: Ensure it is actually a Module before accessing parameters
-            if isinstance(block, nn.Module):
-                for param in block.parameters():
-                    param.requires_grad = False
-            else:
-
-                print(f"Warning: Block {i} is not an nn.Module.")
-
-        print(f"Frozen Timm backbone: Stem + first {limit} blocks")
-
-    # 2. Handle Torchvision Models (EfficientNet, ResNet, etc.)
-    elif hasattr(model, 'features'):
-        print('Detected Torchvision model structure.')
-        features = list(cast(nn.ModuleList, model.features).children())
-        limit = min(frozen_stages, len(features))
-
-        for i in range(limit):
-            feature = features[i]
-            if isinstance(feature, nn.Module):
-                for param in feature.parameters():
-                    param.requires_grad = False
-
-        print(f"Frozen Torchvision features: first {limit} layers")
-
-    else:
-        print('Warning: Model structure unknown. Skipping freeze.')
-
-
-def adaptive_batch_norm(model, val_transforms, data_loader, device, num_batches=100, momentum=0.1):
-    """Adapts the batch normalization layers of the model using a subset of the training data"""
-
-    model.train()
-    # reset running mean and variance for all batch normalization layers
-    for module in model.modules():
-        if isinstance(module, (nn.BatchNorm2d, nn.SyncBatchNorm)):
-            module.reset_running_stats()
-            module.momentum = momentum
-
-    with torch.no_grad():
-
-        for i, (imgs, _) in enumerate(data_loader):
-            if i >= num_batches:
-                break
-            imgs = imgs.to(device)
-            model(imgs)
-    print('Adaptive BatchNorm completed')
 
 
 def invert_label(y):

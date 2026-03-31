@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import timm
 import torch
 from lightning.pytorch.loggers import TensorBoardLogger
-from spoofdet.efficient_net.model_utils import adaptive_batch_norm
-from spoofdet.efficient_net.model_utils import freeze_stages
+from spoofdet.utils.model import adaptive_batch_norm
+from spoofdet.utils.model import freeze_stages
 from torch import nn
 from torchmetrics.classification import BinaryAccuracy
 from torchmetrics.classification import BinaryConfusionMatrix
