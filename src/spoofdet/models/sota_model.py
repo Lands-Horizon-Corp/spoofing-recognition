@@ -20,17 +20,13 @@ from torchmetrics.classification import MulticlassF1Score
 from torchmetrics.classification import MulticlassPrecision
 from torchmetrics.classification import MulticlassRecall
 from torchvision import models
-from torchvision.transforms import v2
 
 
-class EfficientNetSpoofingDetection(L.LightningModule):
+class SpoofingDetection(L.LightningModule):
     def __init__(self,
                  backbone_model,
                  backbone_lr=1e-5,
                  head_lr=3e-4,
-                 val_transforms=None,
-                 train_transforms=None,
-                 train_data_loader=None,
                  criterion=torch.nn.BCEWithLogitsLoss(),
                  target_size=224,
                  frozen_stages=3):
@@ -50,9 +46,6 @@ class EfficientNetSpoofingDetection(L.LightningModule):
                     'test_confmat'])
         self.backbone_model: Literal['efficientnet_v2_s',
                                      'mobile_net_v4'] = backbone_model
-        self.train_data_loader = train_data_loader
-        self.train_transforms: v2.Compose | None = train_transforms
-        self.val_transforms: v2.Compose | None = val_transforms
         self.criterion: nn.Module = criterion
         self.backbone_lr: float = backbone_lr
         self.head_lr: float = head_lr
@@ -100,9 +93,10 @@ class EfficientNetSpoofingDetection(L.LightningModule):
         x = self.head(x)
         return x
 
-    def on_fit_start(self) -> None:
-        adaptive_batch_norm(self.backbone, self.val_transforms,
-                            self.train_data_loader, self.device)
+    def on_train_start(self) -> None:
+
+        train_loader = self.trainer.train_dataloader
+        adaptive_batch_norm(self.backbone, train_loader, self.device)
         freeze_stages(self.backbone, frozen_stages=self.frozen_stages)
 
     def _step(self, batch):

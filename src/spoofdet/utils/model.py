@@ -60,7 +60,7 @@ def freeze_stages(model: nn.Module, frozen_stages: int):
         print('Warning: Model structure unknown. Skipping freeze.')
 
 
-def adaptive_batch_norm(model, val_transforms, data_loader, device, num_batches=100, momentum=0.1):
+def adaptive_batch_norm(model, data_loader, device, num_batches=100, momentum=0.1):
     """Adapts the batch normalization layers of the model using a subset of the training data"""
 
     model.train()

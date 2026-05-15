@@ -6,7 +6,7 @@ from typing import Literal
 import matplotlib.pyplot as plt
 import torch
 from matplotlib.figure import Figure
-from spoofdet.spoofing_metric import SpoofingMetric
+from spoofdet.metrics.spoofing_metric import SpoofingMetric
 from torch.utils.data import DataLoader
 from torchmetrics.classification import Accuracy
 from torchmetrics.classification import F1Score

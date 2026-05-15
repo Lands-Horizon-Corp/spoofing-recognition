@@ -6,28 +6,28 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks import TQDMProgressBar
 from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.loggers import TensorBoardLogger
-
-from .config import EARLY_STOPPING_LIMIT
-from .config import EPOCHS
-from .config import MODEL_NAME
+from spoofdet import config as config
+# from .config import EARLY_STOPPING_LIMIT
+# from .config import EPOCHS
+# from .config import MODEL_NAME
 
 checkpoint_callback = ModelCheckpoint(
     monitor='val_loss',
     dirpath='checkpoints/',
-    filename=MODEL_NAME + '_{epoch:02d}_{val_loss:.4f}',
+    filename=config.MODEL_NAME + '_{epoch:02d}_{val_loss:.4f}',
     save_top_k=1,
     mode='min'
 )
 
-my_logger = CSVLogger(save_dir='logs/', name=str(MODEL_NAME) + '_run')
+my_logger = CSVLogger(save_dir='logs/', name=str(config.MODEL_NAME) + '_run')
 trainer = L.Trainer(accelerator='gpu',
-                    devices=1, max_epochs=EPOCHS,
+                    devices=1, max_epochs=config.EPOCHS,
                     callbacks=[EarlyStopping(
                         monitor='val_loss',
-                        patience=EARLY_STOPPING_LIMIT),
+                        patience=config.EARLY_STOPPING_LIMIT),
                         TQDMProgressBar(refresh_rate=20),
                         checkpoint_callback],
-                    logger=[TensorBoardLogger('tb_logs', name=MODEL_NAME),
+                    logger=[TensorBoardLogger('tb_logs', name=config.MODEL_NAME),
                             my_logger],
                     enable_progress_bar=True,
                     # precision="bf16",
